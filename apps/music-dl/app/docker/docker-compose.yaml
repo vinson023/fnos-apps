@@ -1,0 +1,11 @@
+services:
+  music-dl:
+    image: guohuiyuan/go-music-dl:latest
+    container_name: music-dl
+    restart: always
+    ports:
+      - "8099:8080"
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/music-dl:/app/data

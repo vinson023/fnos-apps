@@ -1,0 +1,7 @@
+{
+    "defaults": {
+        "run-as": "package"
+    },
+    "username": "video-download-reclip",
+    "groupname": "video-download-reclip"
+}

@@ -1,0 +1,12 @@
+appname=emby
+version=1.0.0
+display_name=Emby
+desc=Emby 媒体服务器，将您的个人媒体库变成流媒体服务。
+source=thirdparty
+platform=all
+maintainer=Custom
+desktop_uidir=ui
+desktop_applaunchname=emby.main
+service_port=8096
+ctl_stop=true
+checkport=true

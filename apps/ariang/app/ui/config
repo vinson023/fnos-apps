@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "ariang.main": {
+            "title": "Aria2 Pro",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "6880",
+            "url": "/",
+            "width": 1280,
+            "height": 860,
+            "allUsers": false
+        }
+    }
+}

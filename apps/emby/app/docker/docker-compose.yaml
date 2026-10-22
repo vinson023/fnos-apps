@@ -1,0 +1,13 @@
+services:
+  embyserver:
+    image: amilys/embyserver:latest
+    container_name: embyserver
+    restart: always
+    network_mode: host
+    environment:
+      - TZ=Asia/Shanghai
+      - PUID=0
+      - PGID=0
+    volumes:
+      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/emby/config:/config
+      - ${MEDIA_DIR:-/vol1/1000/video}:/media

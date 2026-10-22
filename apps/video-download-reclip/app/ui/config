@@ -1,0 +1,13 @@
+{
+    ".url": {
+        "video-download-reclip.main": {
+            "title": "ReClip",
+            "icon": "images/icon_{0}.png",
+            "type": "url",
+            "protocol": "",
+            "port": "8899",
+            "url": "/",
+            "allUsers": false
+        }
+    }
+}

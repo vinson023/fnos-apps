@@ -1,0 +1,12 @@
+# 统一换行：仓库内一律 LF（cmd/ 下是 bash 脚本，CRLF 会导致 bad interpreter）
+* text=auto eol=lf
+
+# 二进制资源不要做换行转换
+*.PNG binary
+*.png binary
+*.ico binary
+*.eot binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.fpk binary

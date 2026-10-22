@@ -1,0 +1,12 @@
+appname=music-dl
+version=1.0.0
+display_name=Music-DL
+desc=Music-DL music download tool
+source=thirdparty
+platform=all
+maintainer=Custom
+desktop_uidir=ui
+desktop_applaunchname=music-dl.main
+service_port=8099
+ctl_stop=true
+checkport=true
