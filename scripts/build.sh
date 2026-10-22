@@ -32,6 +32,9 @@ for app in "${APPS[@]}"; do
     version="$(grep -m1 '^version=' "$src/manifest" | cut -d= -f2)"
     echo "==> 构建 $app (v$version)"
 
+    # 从 Windows/压缩包同步过来的源码常丢失可执行位，缺了会导致安装后脚本无法执行
+    chmod +x "$src"/cmd/* 2>/dev/null || true
+
     # fnpack 把产物写到当前工作目录，所以先切到 dist
     ( cd "$DIST" && fnpack build -d "$src" )
 
