@@ -1,15 +1,27 @@
 services:
   ariang:
+    # 只做静态托管和反代，不需要 PHP/Node 等运行时，nginx:alpine 体积最小
     image: nginx:alpine
     container_name: ariang
+    # 异常退出或宿主机重启后自动拉起
     restart: always
+    # host 模式：与宿主机共用网络栈，才能直接反代 127.0.0.1:6800 上的 aria2；
+    # 同时也避开了端口映射在 IPv4/IPv6 双栈下的差异（外网访问依赖这一点）
     network_mode: host
     environment:
+      # 时区，影响日志时间与下载任务的时间显示
       - TZ=Asia/Shanghai
     volumes:
+      # AriaNg 静态站随包分发，不依赖宿主机外部目录。
+      # ${TRIM_APPDEST} 是 fnOS 注入的安装路径，实际为 /vol1/@appcenter/ariang
       - ${TRIM_APPDEST}/docker/html:/usr/share/nginx/html:ro
+      # 反代配置：把同源的 /aria2/jsonrpc 转发到 aria2。
+      # 用相对路径后，内网 IP / 外网域名 / IPv4 / IPv6 都能共用同一份配置
       - ${TRIM_APPDEST}/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 跟随宿主机时区
       - /etc/localtime:/etc/localtime:ro
+    # 纯静态文件托管，128MB 绰绰有余
     mem_limit: 128m
     security_opt:
+      # 禁止容器内进程通过 setuid/setgid 提权
       - no-new-privileges:true
