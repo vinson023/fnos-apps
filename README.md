@@ -97,6 +97,16 @@ trim_sac.entry.open_type        ← 展示层
 |---|---|---|
 | `FNOS_DATA_DIR` | `/vol1/1000/docker` | 各应用数据目录的父目录 |
 | `MEDIA_DIR` | `/vol1/1000/video` | Emby 的媒体库目录 |
+| `DOWNLOAD_DIR` | `/vol1/1000/Download` | Music-DL 的下载落盘目录 |
+
+Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
+
+| 宿主机 | 容器内 | 用途 |
+|---|---|---|
+| `$DOWNLOAD_DIR` | `/home/appuser/data/downloads` | 下载的音乐文件 |
+| `$FNOS_DATA_DIR/music-dl` | `/home/appuser/data` | 配置、缓存、日志 |
+
+镜像里**没有** `/app/data` 这个路径，挂到那里数据不会被读到。
 
 Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
 
