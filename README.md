@@ -3,15 +3,15 @@
 把常用的 Docker 应用封装成 **fnOS（飞牛 OS）原生应用包（`.fpk`）** 的构建源码集合。
 
 封装后这些容器不再是「Docker 应用」里的一个条目，而是变成应用中心里的正式应用：有独立图标、
-能出现在 fnOS 桌面、点击在桌面窗口内直接打开（iframe，不跳浏览器页签）、随应用中心统一启停，
-并且可以通过 `appcenter-cli` 脚本化管理。
+能出现在 fnOS 桌面、点击即打开（`type` 决定是桌面内 iframe 窗口还是新浏览器页签）、
+随应用中心统一启停，并且可以通过 `appcenter-cli` 脚本化管理。
 
 ## 应用列表
 
 | 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 |
 |---|---|---|---|---|
 | Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 |
-| Emby | `emby` | 8096 | `amilys/embyserver:latest` | iframe 窗口 |
+| Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 |
 | ReClip | `video-download-reclip` | 8899 | `heizicao/reclip:latest` | 新页签 |
 
@@ -69,6 +69,25 @@ appcenter-cli uninstall ariang
 appcenter-cli install-fpk ariang.fpk
 appcenter-cli start ariang
 ```
+
+## 桌面打开方式（iframe / 新页签）
+
+由 `app/ui/config` 里 `.url.<id>.type` 决定：
+
+- `"iframe"` → 在 fnOS 桌面内开窗口，可用 `width` / `height` 指定尺寸（Aria2 Pro 用 1280×860）；
+- `"url"` → 新开浏览器页签。
+
+**已安装的应用改 `ui/config` 不会立即生效**。`open_type` 有三层数据源，且以数据库为根源：
+
+```
+appcenter.app_service.type      ← 根源，trim_sac 重启时据此重建下层
+appcenter.app_open.open_type
+trim_sac.entry.open_type        ← 展示层
+```
+
+只改 `trim_sac.entry` 会被覆盖回原值，必须从 `app_service` 改起。反过来，
+**重新安装 fpk 时包里的 `ui/config` 会写回数据库**——所以源码里的值必须和期望一致，
+否则每次重装都会被打回。本项目曾因 Emby 源码里遗留 `iframe` 而反复变回窗口模式。
 
 ## 可配置项
 
