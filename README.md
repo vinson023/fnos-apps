@@ -78,7 +78,12 @@ appcenter-cli start ariang
 |---|---|---|
 | `FNOS_DATA_DIR` | `/vol1/1000/docker` | 各应用数据目录的父目录 |
 | `MEDIA_DIR` | `/vol1/1000/video` | Emby 的媒体库目录 |
-| `ARIA2_SECRET` | 空 | AriaNg 连接 aria2 用的 RPC 密钥（base64 前的明文，前端会自行编码） |
+
+Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
+
+- **推荐**：首次打开 AriaNg 后到 `AriaNg 设置 → RPC 密钥` 填一次，配置会存在浏览器 localStorage；
+- 或在 `apps/ariang/app/docker/html/index.html` 里、注入脚本之前加一行
+  `window.ARIA2_SECRET='你的密钥';`，随包固化（注意这是明文提交，仅适合自建自用）。
 
 ## Aria2 Pro 的两个特殊处理
 
