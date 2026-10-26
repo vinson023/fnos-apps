@@ -13,7 +13,7 @@
 | Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 |
 | Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 |
-| ReClip | `video-download-reclip` | 8899 | `heizicao/reclip:latest` | 新页签 |
+| ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 |
 
 ## 仓库结构
 

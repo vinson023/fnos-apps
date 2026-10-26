@@ -1,7 +1,7 @@
 services:
   reclip:
     # 免费视频/音频解析下载工具
-    image: heizicao/reclip:latest
+    image: reclipd/reclip:latest
     container_name: reclip
     # 异常退出或宿主机重启后自动拉起
     restart: always
