@@ -14,6 +14,7 @@
 | Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 |
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 |
+| MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 |
 
 ## 仓库结构
 
@@ -126,6 +127,19 @@ Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
    - `T()` 从 `location` 推导 rpcHost/rpcPort/protocol/interface，避免空值卡死。
 
    补丁在压缩产物上直接改，改完可用 `node --check` 验证语法。
+
+## MeTube 的三个注意点
+
+1. **不要给它加安全加固**。镜像的 entrypoint 以 root 启动，先对 `$DOWNLOAD_DIR` / `$STATE_DIR`
+   做 `chown -R $PUID:$PGID`，再用 `gosu` 降权到该 UID/GID 运行 `python3 app/main.py`。
+   加 `cap_drop: [ALL]` 会让 chown 失败，加 `no-new-privileges` 会让降权失效——容器能起来但写不进文件。
+   同理**没有**设 `mem_limit`：合并大体积视频时内存占用明显抬升，硬上限容易 OOM 失败。
+2. **host 网络 + `PORT` 环境变量**。容器内 `PORT=8081` 直接占用宿主机 8081，不做端口映射。
+   要换端口得同时改三处：compose 里的 `PORT`、`manifest` 的 `service_port`、`app/ui/config` 的 `port`，
+   漏改一处就会出现「应用中心显示已启动但点开是空白」。
+3. **下载目录默认落在数据目录下**（`$FNOS_DATA_DIR/metube/downloads`），不是媒体库。
+   想让成品直接进媒体库，把这条挂载改到 `$MEDIA_DIR` 之类的位置即可；
+   `TEMP_DIR` 与 `DOWNLOAD_DIR` 保持同一磁盘可避免合并时跨设备拷贝。
 
 ## 关于第三方代码
 

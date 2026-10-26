@@ -1,0 +1,37 @@
+services:
+  metube:
+    # 基于 yt-dlp 的自托管视频下载器，Web 界面提交链接、管理下载队列
+    image: ghcr.io/alexta69/metube:latest
+    container_name: metube
+    # 异常退出或宿主机重启后自动拉起
+    restart: always
+    # host 模式：容器内 PORT 直接占用宿主机 8081，不再做端口映射。
+    # 同时避免桥接模式下 yt-dlp 走 NAT 的额外开销
+    network_mode: host
+    environment:
+      # 时区，影响下载任务与日志时间
+      - TZ=Asia/Shanghai
+      # 容器内实际运行身份。entrypoint 以 root 启动、chown 数据目录后
+      # 用 gosu 降权到该 UID:GID，因此必须与下载目录的属主一致
+      - PUID=1000
+      - PGID=1000
+      # 新建文件的权限掩码，022 表示组内与其他用户可读
+      - UMASK=022
+      # 容器内监听端口，需与 manifest 的 service_port 一致
+      - PORT=8081
+      # 成品落盘目录（容器内路径）
+      - DOWNLOAD_DIR=/downloads
+      # 队列状态与配置的持久化目录（容器内路径）
+      - STATE_DIR=/config
+      # 下载中的临时文件目录。与成品同盘可避免合并时跨设备拷贝
+      - TEMP_DIR=/downloads
+    volumes:
+      # 下载成品目录（宿主机）
+      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/metube/downloads:/downloads
+      # 配置与队列状态，删除会丢失下载历史与全部设置
+      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/metube/config:/config
+      # 跟随宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+    # 说明：此处不设 mem_limit 与 cap_drop。
+    # entrypoint 需要 root 权限对数据目录做 chown，再用 gosu 降权；
+    # 合并大体积视频时内存占用也会明显抬升，加硬上限容易 OOM 失败

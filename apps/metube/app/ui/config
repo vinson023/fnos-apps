@@ -1,0 +1,13 @@
+{
+    ".url": {
+        "metube.main": {
+            "title": "MeTube",
+            "icon": "images/icon_{0}.png",
+            "type": "url",
+            "protocol": "",
+            "port": "8081",
+            "url": "/",
+            "allUsers": false
+        }
+    }
+}
