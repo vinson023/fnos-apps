@@ -19,7 +19,8 @@
 | Motrix | `motrix` | 8080、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
 | MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 数据目录、媒体库、下载目录、管理员账号 |
 
-**八个应用都带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+**八个应用里七个带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+唯一没有向导的是 `aria2ng`——它是纯静态站点，没有任何需要配置的路径。
 
 ## 仓库结构
 
@@ -173,7 +174,7 @@ trim_sac.entry.open_type        ← 展示层
 **重新安装 fpk 时包里的 `ui/config` 会写回数据库**——所以源码里的值必须和期望一致，
 否则每次重装都会被打回。本项目曾因 Emby 源码里遗留 `iframe` 而反复变回窗口模式。
 
-## AriaNg 的两个注意点
+## AriaNg 的三个注意点
 
 1. **纯静态，没有任何反向代理**。`app/docker/default.conf` 只做静态托管，容器里没有
    `proxy_pass`。AriaNg 以浏览器的身份直接去连 aria2 的 RPC 端口，依赖 aria2 自带的
@@ -185,7 +186,7 @@ trim_sac.entry.open_type        ← 展示层
 
 2. **零补丁，只有一处默认语言**。`html/` 直接用官方 AriaNg v1.2.3 的 release 包，
    唯一改动是把 `ariaNgDefaultOptions.language` 从 `"en"` 改成 `"zh_Hans"`——一个常量，
-   界面上随时能改回去。没有语言锁定、没有 RPC 锁定、没有注入脚本。
+   界面上随时能改回去。没有语言锁定、没有 RPC 锁定。
 
    这里踩过两个坑，值得记一笔：
 
@@ -197,6 +198,31 @@ trim_sac.entry.open_type        ← 展示层
      缺失的 `langs/xxx.txt` 会返回 200 + HTML，AriaNg 解析出一堆垃圾键，同样表现为英文。
      所以 `default.conf` 给 `/langs/` 单独加了 `try_files $uri =404`。
 
+3. **1.0.1 起有一段一次性配置迁移**，写在 `index.html` 的 `<head>` 最前面（内联，早于
+   Angular 启动）。原因很实在：旧版 Aria2 Pro 的 appname 是 `ariang`，和本应用**同端口、
+   同 origin**，浏览器把两者的配置存在同一份 `AriaNg.Options` 里。旧版把 `rpcInterface`
+   写死成 `aria2/jsonrpc`、语言写成 `zh_CN`、地址指向内网 IP、密钥清成空串，这些残留会
+   直接表现为「界面英文 + 接口填错 + 连不上」。
+
+   迁移只在 `AriaNg.Migrate` 标记不存在时跑一次，纠正这几类**已知错误值**：
+
+   | 字段 | 从 | 到 |
+   |---|---|---|
+   | `language` | `zh_CN` / `en` / `en-US` 等 | `zh_Hans`（`zh_Hant` 保留） |
+   | `rpcInterface` | `aria2/jsonrpc` | `jsonrpc` |
+   | `rpcPort` | 等于本页端口（如 6880） | `6800` |
+   | `rpcHost` | 空 / 回环地址 / 外网访问时的内网 IP | 当前访问的 hostname |
+   | `protocol` | 缺失或非法 | 按本页协议补 `http` / `https` |
+
+   **只改这几种确定错的值，`secret` 永远不动，用户自定义的反代路径（如 `my/jsonrpc`）也不动**。
+   跑过一次就写标记，之后用户在设置里改什么都不再被覆盖。想重跑：
+   `localStorage.removeItem("AriaNg.Migrate")` 再刷新。
+
+   `protocol` 那条兜底不是可有可无：`getCurrentRpcUrl()` 是
+   `e.protocol + "://" + e.rpcHost + ":" + e.rpcPort + "/" + e.rpcInterface` 直接拼的，
+   缺 `protocol` 会拼出 `undefined://host:6800/jsonrpc`，界面上只显示「未连接」，
+   从现象完全看不出原因。
+
    **验证方法**（CDP 驱动无头 Chrome，比肉眼看可靠）：
 
    | 场景 | 期望 |
@@ -204,6 +230,8 @@ trim_sac.entry.open_type        ← 展示层
    | localStorage 清空 | 中文界面，状态「未连接」（没配 RPC，属正常） |
    | 手填 RPC 地址/端口/密钥 | 状态「已连接」，能列出任务 |
    | 改一次 RPC 后刷新 | 改动保留，仍「已连接」 |
+   | 种入旧 ariang 残留配置（`zh_CN` + `aria2/jsonrpc` + 内网 IP + 缺 `protocol`） | 首次加载后全部被纠正，「已连接」 |
+   | 迁移后再把语言改成 `en`、端口改成 `6900`，刷新 | 原样保留，迁移不再触发 |
 
 ## MeTube 的三个注意点
 
@@ -325,8 +353,12 @@ device-code 远程配对。
 
 `apps/aria2ng/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) v1.2.3
 官方 release 包的原样内联（MIT License，原始许可证保留在 `html/LICENSE`），仅为离线自包含。
-唯一的改动是 `js/aria-ng-*.min.js` 里 `ariaNgDefaultOptions.language` 由 `"en"` 改为
-`"zh_Hans"`（默认语言，界面可改），其余字节与上游完全一致。
+改动只有两处，都记在 `README` 的「AriaNg 的三个注意点」里：
+
+1. `js/aria-ng-*.min.js` 里 `ariaNgDefaultOptions.language` 由 `"en"` 改为 `"zh_Hans"`
+   （默认语言，界面可改），其余字节与上游完全一致；
+2. `index.html` 的 `<head>` 最前面加了一段一次性配置迁移脚本，并给 css/js 引用加了
+   `?v=<版本>` 查询串（绕开浏览器里旧 `ariang` 留下的同名缓存文件）。
 
 `apps/motrix/app/docker/patch/app-settings-<hash>.js` 是 Motrix 官方镜像里
 `/app/dist/renderer-web/assets/` 下的同名前端 chunk，**仅替换了一个常量**
