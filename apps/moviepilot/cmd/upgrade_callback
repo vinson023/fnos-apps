@@ -1,0 +1,9 @@
+#!/bin/bash
+# 升级后回调。部署信息存在 ${TRIM_PKGETC}/info.txt，该目录不随应用目录替换，
+# 升级不会丢，所以这里无需还原任何东西。
+#
+# 注意：升级会重建容器，但数据目录（含数据库与浏览器内核）在外面，不会丢。
+DIR="$(cd "$(dirname "$0")" && pwd)"
+[ -f "${DIR}/_common.sh" ] && . "${DIR}/_common.sh"
+log "upgrade_callback: 升级完成，部署信息保留在 ${TRIM_PKGETC}/info.txt"
+exit 0

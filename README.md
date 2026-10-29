@@ -17,8 +17,9 @@
 | MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 配置目录、下载目录 |
 | RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
 | Motrix | `motrix` | 8080、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
+| MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 数据目录、媒体库、下载目录、管理员账号 |
 
-**七个应用都带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+**八个应用都带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 ## 仓库结构
 
@@ -38,7 +39,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（六个应用都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（八个应用都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -138,6 +139,10 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 | `motrix` | `wizard_download_dir` | `/vol1/1000/Download` | `/downloads` |
 | `motrix` | `wizard_operator_token` | 无（必须自己设） | Web 登录密码 |
 | `motrix` | `wizard_public_url` | 留空 | 远程配对审批地址，非挂载 |
+| `moviepilot` | `wizard_data_dir` | `/vol1/1000/docker/moviepilot` | `/config` 与 `/moviepilot/.cloakbrowser`（两个子目录） |
+| `moviepilot` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
+| `moviepilot` | `wizard_download_dir` | `/vol1/1000/Download` | `/downloads` |
+| `moviepilot` | `wizard_superuser` / `wizard_superuser_password` | `admin` / 无（必须自己设） | 超级管理员账号，非挂载 |
 
 Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
 
@@ -273,6 +278,37 @@ environment:
 （`16800`，只监听 loopback），和独立部署的 `aria2-pro`（`6800`）是两个互不相干的引擎。
 Motrix 额外提供原生 BT/磁力、插件体系、tracker 订阅，以及 `@motrix/cli` / AI agent 的
 device-code 远程配对。
+
+## MoviePilot 的七个注意点
+
+1. **前后端是两个端口**。镜像里 FastAPI 后端监听 `3001`、nginx 前端监听 `3000`，
+   对外只映射 `3000`。compose 里把 `NGINX_PORT` / `PORT` 都显式写出来了，
+   避免以后镜像改默认值时静默错位。健康检查走的是**后端 3001**
+   （`/api/v1/system/global?token=moviepilot`），所以「前端 200」不等于「后端就绪」，
+   刚启动那几十秒 API 会返回 502。
+2. **首次启动要下 206MB 浏览器内核，解压后 717MB**。这是 CloakBrowser（站点认证用的
+   隐身 Chromium），默认落在容器内的 `$HOME/.cloakbrowser`，**容器一重建就没了**。
+   所以单独把 `${wizard_data_dir}/cloakbrowser` 挂到 `/moviepilot/.cloakbrowser`：
+   实测首次启动要几分钟，挂上之后重建容器 **19–25 秒**就绪，`Download progress` 一行都不会出现。
+   代价是数据目录要多留 700MB。
+3. **`MOVIEPILOT_AUTO_UPDATE=false`**。默认值是 `release`，容器每次启动都会去 GitHub
+   拉新版覆盖自己，fpk 的版本号就失去意义了。关掉启动自更新后，界面里「重启并更新」
+   仍然可用——它走的是 `/config/temp/moviepilot.pending_update` 一次性标记，不受这个变量影响。
+4. **管理员账号靠环境变量在首次启动时建好**。`SUPERUSER` / `SUPERUSER_PASSWORD`
+   由入口脚本写进 `app.env` 并入库，装完直接登录，不用走 Web 初始化向导。
+   密码只在安装时出现一次，所以写进了 `/vol1/@appconf/moviepilot/info.txt`。
+   注意 `SUPERUSER` 只是 MoviePilot 自己的用户名，**不会**同步到 Emby / Jellyfin；
+   但如果同时用 Jellyfin，建议填成和 Jellyfin 管理员同名，否则联动功能会提示找不到账号。
+5. **下载目录必须和下载器里配的路径指向同一个宿主机目录**。两边路径不一致时，
+   硬链接、秒传、做种校验全部失效，整理入库会退化成跨盘复制（很慢且占双倍空间）。
+6. **没有挂 `docker.sock`**。挂上之后 MoviePilot 会额外起一个 nginx docker 代理，
+   等于把宿主机 root 权限交给容器，默认不开。确实需要（个别插件要管容器）时，
+   自己在 compose 里加 `- /var/run/docker.sock:/var/run/docker.sock:ro`。
+7. **镜像只有 amd64**，ARM 机器（如某些 arm64 NAS）装不了。另外 `/dev/shm` 默认只有 64MB，
+   如果站点认证用的浏览器偶发崩溃，可以给 compose 加 `shm_size: 1gb` 再试。
+
+另外两点实现细节：入口脚本自带 `tini`，compose 里**不能**再加 `init: true`（会变成双份 init）；
+`PUID`/`PGID` 默认 0，想改成普通用户直接改这两个值即可，入口脚本会自动 chown `/config`。
 
 ## 关于第三方代码
 

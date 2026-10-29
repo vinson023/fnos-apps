@@ -1,0 +1,25 @@
+#!/bin/bash
+# start / stop 留空：容器由 fnOS 通过 Docker API 管理（config/resource 里的 docker-project），
+# 应用用户没有 docker 权限，自己启停会失败。
+# status 用 Web 端口是否监听来判断。退出码：0 运行中，3 已停止
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+case "$1" in
+    start)
+        exit 0
+        ;;
+    stop)
+        exit 0
+        ;;
+    status)
+        if listening_ports | grep -qx "${WEB_PORT}"; then
+            exit 0
+        fi
+        exit 3
+        ;;
+    *)
+        echo "用法: $0 {start|stop|status}"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,47 @@
+services:
+  moviepilot:
+    # 官方 v2 镜像：FastAPI 后端 + nginx 前端 + CloakBrowser 浏览器内核，
+    # 多架构标签存在但实际只有 amd64（见 manifest 与 README）
+    image: jxxghp/moviepilot-v2:latest
+    container_name: moviepilot
+    # 入口脚本自己用 tini 托管进程，这里不能再加 init: true，否则会有两份 init
+    #
+    # 优雅退出：入口脚本收到 SIGTERM 会先停 nginx、再等 Python 把数据库会话写完。
+    # 默认 10 秒不够，任务跑起来时容易在退出瞬间丢状态
+    stop_grace_period: 60s
+    ports:
+      # 3000 是前端 nginx，对外只需要这一个。
+      # 后端 FastAPI 监听 3001，只在容器内由 nginx 反代，不对外暴露
+      - "3000:3000"
+    environment:
+      - TZ=Asia/Shanghai
+      # 容器内以 root 运行：入口脚本要 groupmod/usermod 改 moviepilot 用户，
+      # 再 gosu 降权。官方镜像默认就是 0:0，这里写明是为了不让读者误以为要改。
+      # 想换成普通用户，把 PUID/PGID 改成宿主机用户的 uid/gid 即可，
+      # 入口脚本会自动 chown /config
+      - PUID=0
+      - PGID=0
+      - UMASK=000
+      # 显式写出前后端端口，避免以后镜像改默认值时静默错位
+      - NGINX_PORT=3000
+      - PORT=3001
+      # 关掉启动时自动从 GitHub 拉新版覆盖自己。fpk 的版本号应该由包决定，
+      # 否则重装一次就被容器内自更新带跑，版本不可控。
+      # 界面里「重启并更新」仍然可用（走 /config/temp 的一次性标记），不受影响
+      - MOVIEPILOT_AUTO_UPDATE=false
+      # 超级管理员。设置后首次启动直接建好账号，不用再去 Web 界面走初始化
+      - SUPERUSER=${wizard_superuser}
+      - SUPERUSER_PASSWORD=${wizard_superuser_password}
+    volumes:
+      # 数据库、app.env、插件、证书都在这里
+      - ${wizard_data_dir}/config:/config
+      # 浏览器内核（CloakBrowser，解压后约 700MB）。默认落在镜像内的 $HOME 下，
+      # 容器一重建就没了、要重新下 200MB，所以单独挂出来持久化。
+      # 实测：挂上之后重建容器启动 19 秒，不挂要等下载+解压
+      - ${wizard_data_dir}/cloakbrowser:/moviepilot/.cloakbrowser
+      # 媒体库：MoviePilot 要能看到最终入库位置，才能识别已有媒体、做洗版判断
+      - ${wizard_media_dir}:/media
+      # 下载目录：必须和下载器里看到的路径一致，否则无法做硬链接/秒传与做种校验
+      - ${wizard_download_dir}:/downloads
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped

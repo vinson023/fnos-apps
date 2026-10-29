@@ -1,0 +1,113 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "MoviePilot 是媒体库自动化管家：订阅想看的东西，它自动搜索种子、推给下载器、下载完重命名整理进媒体库，再通知你。<br><br>使用<b>桥接网络</b>，只占用宿主机 <b>3000/TCP</b>（后端 3001 只在容器内部，不对外）。<br><br><b>首次启动会下载约 200MB 的浏览器内核</b>（用于站点认证），解压后约 700MB，需要几分钟；内核会存到你选的数据目录里，以后重建容器不会重复下载。<br><br>装完还需要在界面里配置<b>下载器</b>（qBittorrent / Transmission）和<b>媒体服务器</b>（Emby / Jellyfin）才能真正跑起来。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "存储位置",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "配置目录",
+                "initValue": "/vol1/1000/docker/moviepilot",
+                "description": "数据库、设置、插件、证书和浏览器内核都放在这里（其下的 config 与 cloakbrowser 两个子目录）。注意浏览器内核占 700MB 左右，别选容量紧张的盘。填绝对路径，目录不存在会自动创建。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写配置目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_media_dir",
+                "label": "媒体库目录",
+                "initValue": "/vol1/1000/video",
+                "description": "你的影音文件最终存放的位置，会以 /media 挂进容器。MoviePilot 要靠它识别已有媒体、判断是否洗版。建议和 Emby / Jellyfin 用的是同一个目录。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写媒体库目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_download_dir",
+                "label": "下载目录",
+                "initValue": "/vol1/1000/Download",
+                "description": "下载器的下载目录，会以 /downloads 挂进容器。<b>必须和下载器里配置的保存路径指向同一个宿主机目录</b>，否则硬链接、秒传和做种校验都会失效，整理时会变成跨盘复制。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写下载目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "stepTitle": "管理员账号",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "这里设的是 MoviePilot 自己的超级管理员，装完打开 Web 界面直接用它登录，不用再走初始化流程。账号密码会同时写进安装信息文件，忘了可以到 NAS 上查。"
+            },
+            {
+                "type": "text",
+                "field": "wizard_superuser",
+                "label": "管理员用户名",
+                "initValue": "admin",
+                "description": "MoviePilot 的超级管理员用户名。如果同时用 Jellyfin，建议这里填成和 Jellyfin 管理员同名，否则部分联动功能会提示找不到账号。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写管理员用户名"
+                    },
+                    {
+                        "pattern": "^[A-Za-z0-9._-]{3,32}$",
+                        "message": "3-32 个字符，只能是字母、数字、点、下划线、短横线"
+                    }
+                ]
+            },
+            {
+                "type": "password",
+                "field": "wizard_superuser_password",
+                "label": "管理员密码",
+                "description": "至少 8 位。这个密码只用于登录 MoviePilot 自己，不会同步到 Jellyfin / Emby。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写管理员密码"
+                    },
+                    {
+                        "min": 8,
+                        "message": "密码至少 8 位"
+                    },
+                    {
+                        "max": 64,
+                        "message": "密码最多 64 位"
+                    }
+                ]
+            }
+        ]
+    }
+]

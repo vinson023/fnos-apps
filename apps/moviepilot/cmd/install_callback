@@ -1,0 +1,46 @@
+#!/bin/bash
+# 安装后回调：只记录配置，不碰容器。
+#
+# 注意：容器由 fnOS 通过 Docker API 按 docker-compose.yaml 创建，
+# 且在 install_callback 之前就已经建好了；这里再去改 compose 或 docker compose up
+# 都不会生效（应用用户也没有 docker 权限，会报 code 10237）。
+# 向导值能影响容器，靠的是 compose 里的 ${wizard_xxx} 占位符。
+#
+# 这里做的事：把部署参数（含管理员密码）留一份到 PKGETC/info.txt。
+# 管理员密码只在安装时以环境变量形式出现一次，之后只存在于容器环境里，
+# 不落盘就没有别的途径能查到。
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+DATA_DIR="$(wiz wizard_data_dir "${FNOS_DATA_DIR:-/vol1/1000/docker}/moviepilot")"
+MEDIA_DIR="$(wiz wizard_media_dir "${MEDIA_DIR:-/vol1/1000/video}")"
+DL_DIR="$(wiz wizard_download_dir "${DOWNLOAD_DIR:-/vol1/1000/Download}")"
+SUPERUSER="$(wiz wizard_superuser "admin")"
+PASSWORD="$(wiz wizard_superuser_password "")"
+
+mkdir -p "${TRIM_PKGETC}" 2>/dev/null
+
+cat > "${TRIM_PKGETC}/info.txt" <<INFO
+# MoviePilot 部署信息
+# 用下面的用户名密码登录 Web 界面（忘记时看这里，需要 root 或管理员权限）
+DATA_DIR=${DATA_DIR}
+MEDIA_DIR=${MEDIA_DIR}
+DOWNLOAD_DIR=${DL_DIR}
+WEB_URL=http://<NAS地址>:${WEB_PORT}
+SUPERUSER=${SUPERUSER}
+SUPERUSER_PASSWORD=${PASSWORD}
+INSTALLED_AT=$(date '+%F %T')
+INFO
+
+if [ -z "$PASSWORD" ]; then
+    log "警告：未设置管理员密码，首次打开 Web 界面需要走初始化流程手动创建账号"
+else
+    log "部署信息已写入 ${TRIM_PKGETC}/info.txt"
+fi
+
+# 首次启动会下载约 200MB 的浏览器内核，这里明确提示一下，
+# 免得用户看到容器「起来了但打不开页面」以为装坏了
+log "首次启动会下载浏览器内核（约 200MB，解压后约 700MB），通常需要几分钟，期间 ${WEB_PORT} 端口可能还不通"
+log "内核保存在 ${DATA_DIR}/cloakbrowser，以后重建容器不会重复下载"
+
+exit 0

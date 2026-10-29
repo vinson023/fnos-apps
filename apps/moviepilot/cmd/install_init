@@ -1,0 +1,17 @@
+#!/bin/bash
+# 安装前检查：3000 端口必须空闲（桥接网络只映射这一个端口）
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+if listening_ports | grep -qx "${WEB_PORT}"; then
+    msg="端口 ${WEB_PORT} 已被占用。MoviePilot 的 Web 界面需要这个端口，请先停掉占用它的服务（常见是别的下载器或媒体服务器），或改装到其他机器。"
+    log "$msg"
+    # 失败原因写到临时日志文件，安装向导会把内容展示给用户
+    if [ -n "${TRIM_TEMP_LOGFILE}" ]; then
+        printf '%s\n' "$msg" > "${TRIM_TEMP_LOGFILE}"
+    fi
+    exit 1
+fi
+
+log "端口检查通过：${WEB_PORT}"
+exit 0
