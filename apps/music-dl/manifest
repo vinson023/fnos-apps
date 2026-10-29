@@ -1,12 +1,15 @@
 appname=music-dl
-version=1.0.1
+version=1.0.2
 display_name=Music-DL
 desc=Music-DL music download tool
 source=thirdparty
 platform=all
+developer=vinson023
+publisher=vinson023
 maintainer=vinson023
 desktop_uidir=ui
 desktop_applaunchname=music-dl.main
 service_port=8099
 ctl_stop=true
 checkport=true
+distributor=vinson023

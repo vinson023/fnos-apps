@@ -2,7 +2,14 @@
 
 把常用的 Docker 应用封装成 **fnOS（飞牛 OS）原生应用包（`.fpk`）** 的构建源码集合。
 
-作者与维护者：**vinson023**（各包 `manifest` 里的 `maintainer` 字段同此值）。
+作者与维护者：**vinson023**。
+
+> **`manifest` 里跟作者有关的字段有四个，别只写一个**：
+> `developer` / `publisher` / `maintainer` / `distributor`。
+> 应用中心详情页的「开发者」读 `developer`，「发布者」读 `publisher` —— 只写 `maintainer`
+> 的话「开发者」会回退显示它，但「发布者」一栏是空的（显示 `-`）。
+> 这四个字段**只在安装时从 fpk 里读取**，改已装应用的 `/vol1/appcenter-downloads/<app>-<ver>-tpk/manifest`
+> 不生效（重启 `trim_app_center` 也不行），必须出新包重装。
 
 封装后这些容器不再是「Docker 应用」里的一个条目，而是变成应用中心里的正式应用：有独立图标、
 能出现在 fnOS 桌面、点击即打开（`type` 决定是桌面内 iframe 窗口还是新浏览器页签）、

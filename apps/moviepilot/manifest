@@ -1,12 +1,15 @@
 appname=moviepilot
-version=1.0.1
+version=1.0.2
 display_name=MoviePilot
 desc=NAS 媒体库自动化管理工具：订阅、搜索、下载、整理入库与通知一体化。
 source=thirdparty
 platform=all
+developer=vinson023
+publisher=vinson023
 maintainer=vinson023
 desktop_uidir=ui
 desktop_applaunchname=moviepilot.main
 service_port=3000
 ctl_stop=true
 checkport=true
+distributor=vinson023

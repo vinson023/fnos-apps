@@ -1,12 +1,15 @@
 appname=motrix
-version=1.0.2
+version=1.0.3
 display_name=Motrix
 desc=Motrix 下载管理器（HTTP / BT / 磁力），带 Web 界面、插件体系与远程控制。
 source=thirdparty
 platform=all
+developer=vinson023
+publisher=vinson023
 maintainer=vinson023
 desktop_uidir=ui
 desktop_applaunchname=motrix.main
 service_port=8080
 ctl_stop=true
 checkport=true
+distributor=vinson023
