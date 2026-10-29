@@ -1,69 +1,69 @@
 #!/bin/bash
-# 纯静态站点，没有需要初始化的东西。
-# 这里只写一份说明，方便事后查看「打开页面后要填什么」。
+# aria2ng：纯静态站点，没有需要初始化的服务。
+# 这里做两件事：
+#   1) 把用户在 rpc-config.js 里填的服务端配置备份到 @appconf，重装/升级后自动还原；
+#   2) 写一份说明到 @appconf/info.txt。
 
-INFO_DIR="${TRIM_PKGETC:-/vol1/@appconf/aria2ng}"
-mkdir -p "$INFO_DIR" 2>/dev/null
+APPDIR="${TRIM_APPDEST:-/vol1/@appcenter/aria2ng}"
+CONF="${TRIM_PKGETC:-/vol1/@appconf/aria2ng}"
+mkdir -p "$CONF" 2>/dev/null
 
-cat > "${INFO_DIR}/info.txt" <<'EOT' || true
+SRC="${APPDIR}/docker/html/rpc-config.js"
+BAK="${CONF}/rpc-config.js"
+
+# 服务端配置：装之前备份过就还原，否则把包里的模板存一份当基线
+if [ -f "$SRC" ]; then
+    if [ -f "$BAK" ]; then
+        cp -f "$BAK" "$SRC" 2>/dev/null && chmod 644 "$SRC" 2>/dev/null
+    else
+        cp -f "$SRC" "$BAK" 2>/dev/null && chmod 644 "$BAK" 2>/dev/null
+    fi
+fi
+
+cat > "${CONF}/info.txt" <<EOT
 AriaNg —— aria2 的 Web 前端（纯静态，不带后端、不带 aria2）
 
 打开地址
     http://<本机IP>:6880/
 
-首次打开会显示「未连接」，这是正常的：本应用不预设任何 RPC 地址。
-到左侧「AriaNg 设置」里填这几项，保存后立即生效：
+配置放在服务器上，所有设备看到的是同一份
+    配置文件（在飞牛上）：
+        ${APPDIR}/docker/html/rpc-config.js
 
-    别名       随便起，例如 本机 aria2
-    RPC 地址   有域名填域名，没有就填内网 IP（都不要带 http:// 和端口）
-    端口       6800
-    接口       jsonrpc
-    协议       http
-    RPC 密钥   aria2 配置里的 rpc-secret（没改过就是 123456）
+    这个文件里填的 RPC 地址/端口/接口/协议/密钥，会在**每次打开页面**时写进浏览器，
+    所以不管用电脑还是手机、用内网 IP 还是外网域名打开，看到的都是同一份设置、
+    同一个连接状态。改设置就改这个文件，保存后刷新页面即可，不用每台设备各填一遍。
+    重装/升级应用时，这个文件会自动备份到 ${BAK} 再还原回来。
 
-填完点「保存」，状态会变成「已连接」。
+    填法（引号里写值，secret 写明文）：
+        host:       aria2 的地址，例如 nas.example.com（不要带 http:// 和端口）
+        port:       "6800"
+        interface:  "jsonrpc"
+        protocol:   "http"
+        secret:     aria2 配置里的 rpc-secret
 
-如果填完仍显示「未连接」，或者弹出「认证失败」：
-    认证失败 = 密钥为空或不对，这一项不会自动填，必须自己写。
-    未连接   = 地址/端口/接口不对，或者浏览器把请求拦了（见下面「从外网访问」）。
+    host 留空 = 不启用服务端配置，退回「在界面里手动填」的老方式。
 
-说明
-    - 设置保存在浏览器的 localStorage 里，换设备或换域名访问需要重新填一次。
+关于地址：一定要填「内外网都能访问到」的地址
+    有域名就填域名。**不要填内网 IP**（192.168.x.x / 10.x.x.x）：
+    Chrome 有 Private Network Access 限制，从公网域名打开的页面去请求内网地址
+    会被浏览器直接拦截，界面只显示「未连接」，而 aria2 那边什么请求都没收到。
+    实测：域名页面 -> 域名地址 = 已连接；域名页面 -> 内网 IP = 未连接；
+    内网页面 -> 内网 IP = 已连接。
+
+    所以想「在哪打开都一样」，就统一用域名访问，RPC 地址也填同一个域名。
+    路由器上需要把 6880（界面）和 6800（aria2 RPC）都放行。
+
+状态怎么看
+    「认证失败」= 网络通了、密钥为空或不对。检查 rpc-config.js 里的 secret。
+    「未连接」  = 地址/端口/接口不对，或者被浏览器的 Private Network Access 拦了。
+    什么都不显示 = 配置没生效，确认 rpc-config.js 里的 host 不为空，并强刷一次页面。
+
+其他
+    - 配置在浏览器 localStorage 里还有一份副本，但每次加载都会被服务端配置覆盖，
+      所以在界面里改只对当前这次浏览有效——要长期生效请改 rpc-config.js。
     - 浏览器直连 aria2 的 RPC 端口，依赖 aria2 自带的 CORS 头
       （Access-Control-Allow-Origin: *），标准 aria2 与 aria2-pro 镜像都默认开启。
-    - 想再加一台 aria2，点设置页顶部的「+」新建一个 RPC 配置，用左上角的下拉切换。
-
-从外网访问
-    RPC 地址填一个「内网外网都能访问到」的固定地址，填好之后不会再变。
-    有域名就直接填域名（例如 nas.example.com），端口 6800：
-    在家里打开域名、在外面也打开域名，用的是同一份配置、同一个地址。
-
-    **不要填内网 IP**（192.168.x.x / 10.x.x.x）。Chrome 有 Private Network Access
-    限制：从公网域名打开的页面，去请求内网地址会被浏览器直接拦截，界面只会显示「未连接」，
-    而 aria2 那边其实什么请求都没收到。实测：域名页面 → 域名地址 = 已连接；
-    域名页面 → 内网 IP = 未连接；内网页面 → 内网 IP = 已连接。
-
-    RPC 地址不会随你从哪个地址打开页面而变化——填什么就是什么。
-    只有第一次打开、配置还是空的时候，才会用当前访问的域名/IP 作占位，之后不再自动改。
-
-1.0.2 的首次打开会做一次配置迁移
-    旧版 Aria2 Pro（appname ariang）和本应用用同一个端口、同一个域名，
-    浏览器把两者的配置存在同一份 localStorage 里。旧版写坏的值会在这里被纠正一次：
-
-        语言       zh_CN / en / en-US 等  ->  zh_Hans（简体中文）
-        接口       aria2/jsonrpc          ->  jsonrpc
-        端口       等于本页端口（如 6880）->  6800
-        协议       缺失或非法            ->  http / https
-
-    **地址不会被改**，密钥（rpc-secret）也不会被自动填写，这两项由你自己填。
-
-    另外，全新浏览器（或清过网站数据）第一次打开时，会先写入一份完整的默认配置，
-    这样界面一定是简体中文。原因是 AriaNg 在「没有任何配置」时会拿浏览器语言当默认语言，
-    只改内置默认值是没用的——浏览器是英文环境的话，清一次缓存就整站变英文。
-
-    迁移只跑一次，之后你在设置里改的任何东西都不会再被覆盖。
-    想重新触发，在浏览器控制台执行下面这句再刷新：
-        localStorage.removeItem("AriaNg.Migrate")
 EOT
 
 exit 0

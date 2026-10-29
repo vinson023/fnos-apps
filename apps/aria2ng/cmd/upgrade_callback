@@ -1,2 +1,11 @@
 #!/bin/bash
+# 升级后把当前的服务端配置存回 @appconf，保证下次重装能还原。
+APPDIR="${TRIM_APPDEST:-/vol1/@appcenter/aria2ng}"
+CONF="${TRIM_PKGETC:-/vol1/@appconf/aria2ng}"
+SRC="${APPDIR}/docker/html/rpc-config.js"
+BAK="${CONF}/rpc-config.js"
+mkdir -p "$CONF" 2>/dev/null
+if [ -f "$SRC" ]; then
+    cp -f "$SRC" "$BAK" 2>/dev/null && chmod 644 "$BAK" 2>/dev/null
+fi
 exit 0

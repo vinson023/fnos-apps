@@ -10,7 +10,7 @@
 
 | 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 | 安装向导可配置 |
 |---|---|---|---|---|---|
-| AriaNg | `aria2ng` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | 无（全部在界面里填） |
+| AriaNg | `aria2ng` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | 无（界面里填，或写服务端 `rpc-config.js`） |
 | Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 | 配置目录、媒体库目录 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 下载目录、数据目录 |
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
@@ -174,15 +174,16 @@ trim_sac.entry.open_type        ← 展示层
 **重新安装 fpk 时包里的 `ui/config` 会写回数据库**——所以源码里的值必须和期望一致，
 否则每次重装都会被打回。本项目曾因 Emby 源码里遗留 `iframe` 而反复变回窗口模式。
 
-## AriaNg 的四个注意点
+## AriaNg 的五个注意点
 
 1. **纯静态，没有任何反向代理**。`app/docker/default.conf` 只做静态托管，容器里没有
    `proxy_pass`。AriaNg 以浏览器的身份直接去连 aria2 的 RPC 端口，依赖 aria2 自带的
    CORS 头（`Access-Control-Allow-Origin: *`，标准 aria2 与 aria2-pro 镜像都默认开启，
    实测连 `OPTIONS` 预检都正常应答）。
 
-   好处是这个应用**完全不需要知道 aria2 在哪**，没有预设地址、没有密钥下发、没有向导字段；
-   代价是**换设备或换浏览器访问时要重新填一次 RPC**（配置在 localStorage，按 origin 隔离）。
+   好处是这个应用**完全不需要知道 aria2 在哪**，没有预设地址、没有密钥下发、没有向导字段。
+   代价是默认情况下**换设备或换浏览器访问时要重新填一次 RPC**（配置在 localStorage，按
+   origin 隔离）——1.0.3 用「服务端配置」解决这个问题，见第 3 点。
 
 2. **零补丁，只有一处默认语言**。`html/` 直接用官方 AriaNg v1.2.3 的 release 包，
    唯一改动是把 `ariaNgDefaultOptions.language` 从 `"en"` 改成 `"zh_Hans"`——一个常量，
@@ -198,8 +199,46 @@ trim_sac.entry.open_type        ← 展示层
      缺失的 `langs/xxx.txt` 会返回 200 + HTML，AriaNg 解析出一堆垃圾键，同样表现为英文。
      所以 `default.conf` 给 `/langs/` 单独加了 `try_files $uri =404`。
 
-3. **1.0.2 起有一段一次性配置迁移 + 启动前置配置**，写在 `index.html` 的 `<head>` 里
-   （内联，`<meta charset>` 之后、Angular 之前）。两个动因：
+3. **1.0.3 起：配置放在服务端，所有设备看到同一份**。这是用户明确要求的行为——
+   「这个应用装在飞牛上，设置就不该随着我在哪台设备、哪个地址打开而变化，要像远程桌面一样」。
+
+   做法是新增 `app/docker/html/rpc-config.js`（nginx 托管，随包发布，`host` 留空）：
+
+   ```js
+   window.ARIA2NG_RPC = {
+       host: "",          // 留空 = 不启用，退回「在界面里手动填」
+       port: "6800",
+       interface: "jsonrpc",
+       protocol: "http",
+       secret: ""         // 明文，页面自己转 base64
+   };
+   ```
+
+   `index.html` 的 `<head>` 内联脚本（`<meta charset>` 之后、Angular 之前）在**每次加载**时
+   读它并覆盖 localStorage 里的 `AriaNg.Options`。填了 `host` 就以服务端为准，连语言都锁成
+   简体中文；`host` 留空则完全不介入，走下面的手动/迁移逻辑。
+
+   nginx 侧必须给这个文件**精确匹配 + 禁缓存 + 缺失时 404**：
+
+   ```nginx
+   location = /rpc-config.js {
+       try_files $uri =404;
+       add_header Cache-Control "no-cache, no-store, must-revalidate";
+       expires -1;
+   }
+   ```
+
+   三个坑：`location =` 要写在 `location ~* \.(js|css|html|txt)$` 附近，精确匹配优先级更高；
+   少了 `no-store`，改完配置刷新不生效；**少了 `=404` 会被 `try_files ... /index.html` 兜底成
+   200 + HTML**，浏览器拿 HTML 当 JS 执行，配置静默失效、界面一片空白。
+
+   配置的持久化交给三个钩子：`install_callback` / `upgrade_callback` 从
+   `$TRIM_PKGETC/rpc-config.js` 还原，`uninstall_callback` 卸载前先备份过去。
+   否则每次重装升级都会被包里的空模板覆盖。
+
+4. **1.0.2 起有一段一次性配置迁移 + 启动前置配置**，写在 `index.html` 的 `<head>` 里
+   （内联，`<meta charset>` 之后、Angular 之前）。只在第 3 点未启用（`host` 为空）时生效。
+   两个动因：
 
    **(a) 旧版 Aria2 Pro 的残留**。它的 appname 是 `ariang`，和本应用**同端口、同 origin**，
    浏览器把两者的配置存在同一份 `AriaNg.Options` 里。旧版把 `rpcInterface` 写死成
@@ -242,7 +281,7 @@ trim_sac.entry.open_type        ← 展示层
    缺 `protocol` 会拼出 `undefined://host:6800/jsonrpc`，界面上只显示「未连接」，
    从现象完全看不出原因。
 
-4. **「固定 RPC 地址」要填域名，别填内网 IP**。Chrome 的 Private Network Access 会拦截
+5. **「固定 RPC 地址」要填域名，别填内网 IP**。Chrome 的 Private Network Access 会拦截
    「从公网域名打开的页面 → 请求内网地址」，浏览器直接拒绝，aria2 那边连请求都收不到，
    界面只显示「未连接」。实测三种组合：
 
@@ -252,18 +291,19 @@ trim_sac.entry.open_type        ← 展示层
    | 域名 | 内网 IP | 未连接（被浏览器拦） |
    | 内网 IP | 内网 IP | 已连接 |
 
-   所以想「内网外网用同一份配置」，就把 RPC 地址固定成域名，家里和外面都开域名访问。
+   所以想「内网外网用同一份配置」，就把 `rpc-config.js` 里的 `host` 固定成域名，
+   家里和外面都开域名访问。
 
-   **验证方法**（CDP 驱动无头 Chrome，比肉眼看可靠）：
+   **验证方法**（CDP 驱动无头 Chrome，比肉眼看可靠；用 `--lang=en-US` 起浏览器，
+   才能证明服务端配置确实压过了浏览器语言）：
 
    | 场景 | 期望 |
    |---|---|
-   | `localStorage.clear()` 后重开 | 中文界面，且已写入完整默认配置 |
-   | 手填地址/端口/密钥 | 状态「已连接」，能列出任务 |
-   | 改一次 RPC 后刷新 | 改动保留，仍「已连接」 |
-   | 种入旧 ariang 残留（`zh_CN` + `aria2/jsonrpc` + 内网 IP + 缺 `protocol`） | 语言/接口/端口/协议被纠正，**地址与密钥不动** |
+   | `localStorage.clear()` 后重开（英文浏览器） | 中文界面 + 已连接，写入完整配置 |
+   | 外网域名 / 内网 IP 两个入口各开一次 | 配置与状态**完全一致**（`AriaNg.Migrate = server`） |
+   | 在界面里把地址/端口/密钥改错，刷新 | 被 `rpc-config.js` 拉回，仍「已连接」 |
+   | `host` 留空 + 种入旧 ariang 残留（`zh_CN` + `aria2/jsonrpc` + 内网 IP + 缺 `protocol`） | 语言/接口/端口/协议被纠正，**地址与密钥不动** |
    | 迁移后再把语言改成 `en` | 原样保留，迁移不再触发 |
-   | 存一个固定地址，换不同访问地址打开 | 地址不变 |
 
 ## MeTube 的三个注意点
 
@@ -385,12 +425,14 @@ device-code 远程配对。
 
 `apps/aria2ng/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) v1.2.3
 官方 release 包的原样内联（MIT License，原始许可证保留在 `html/LICENSE`），仅为离线自包含。
-改动只有两处，都记在 `README` 的「AriaNg 的三个注意点」里：
+改动有三处，都记在 `README` 的「AriaNg 的五个注意点」里：
 
 1. `js/aria-ng-*.min.js` 里 `ariaNgDefaultOptions.language` 由 `"en"` 改为 `"zh_Hans"`
    （默认语言，界面可改），其余字节与上游完全一致；
-2. `index.html` 的 `<head>` 最前面加了一段一次性配置迁移脚本，并给 css/js 引用加了
-   `?v=<版本>` 查询串（绕开浏览器里旧 `ariang` 留下的同名缓存文件）。
+2. `index.html` 的 `<head>` 最前面加了一段启动前置脚本（服务端配置覆盖 + 一次性配置迁移），
+   并给 css/js 引用加了 `?v=<版本>` 查询串（绕开浏览器里旧 `ariang` 留下的同名缓存文件）；
+3. 新增 `rpc-config.js`——**空的配置模板**（`host: ""`，不含任何地址与密钥），
+   由使用者自己填。它不改变 AriaNg 上游代码的任何行为。
 
 `apps/motrix/app/docker/patch/app-settings-<hash>.js` 是 Motrix 官方镜像里
 `/app/dist/renderer-web/assets/` 下的同名前端 chunk，**仅替换了一个常量**
@@ -405,7 +447,8 @@ device-code 远程配对。
 本仓库由实际部署环境整理而来，发布前已做以下处理：
 
 - `aria2ng` 里**没有任何凭据**：它是官方原版 AriaNg 静态站，RPC 地址、端口、密钥全部由用户
-  在浏览器里自己填，包里没有预设值，也不含反向代理；
+  自己填——可以填在浏览器界面里，也可以填在 `html/rpc-config.js`（仓库里这份是空模板，
+  `host: ""` 即不启用），包里没有预设值，也不含反向代理；
 - 主机绝对路径不再写死在 compose 里，改为安装向导字段（`${wizard_data_dir}` 等），
   默认值与 fnOS 默认布局一致，因此行为不变但不再绑定具体机器；
 - 向导字段的 `initValue` 保留 fnOS 标准路径作为默认值——向导只接受字面量、
