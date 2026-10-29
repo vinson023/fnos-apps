@@ -1,0 +1,45 @@
+#!/bin/bash
+# 安装后：把用户在安装向导里选的值落盘。
+#
+# 写两个位置，各有用途：
+# 1. ${TRIM_PKGETC}/info.txt —— 配置目录，长期留存，供事后排查
+# 2. ${TRIM_APPDEST}/docker/info/meta.txt —— 信息页所在的目录，
+#    页面通过 /meta.txt 读取，用来显示真实的中继地址与密钥
+#
+# 注意：这里不碰数据目录。数据目录由 Docker 在创建容器时生成，属主是 root，
+# 应用用户写不进去。容器本身也不需要在这里重建 —— fnOS 依据
+# docker-compose.yaml 里的 ${wizard_xxx} 变量创建容器，用户选的值已经生效。
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+DATA_DIR="$(wiz wizard_data_dir "${FNOS_DATA_DIR:-/vol1/1000/docker}/rustdesk")"
+RELAY_HOST="$(wiz wizard_relay_host "")"
+FORCE_RELAY="$(wiz wizard_force_relay "N")"
+CUSTOM_KEY="$(wiz wizard_key "-")"
+
+case "$FORCE_RELAY" in
+    Y|y) FORCE_RELAY="Y" ;;
+    *) FORCE_RELAY="N" ;;
+esac
+
+write_meta() {
+    cat > "$1" <<META
+DATA_DIR=${DATA_DIR}
+RELAY_HOST=${RELAY_HOST}
+FORCE_RELAY=${FORCE_RELAY}
+KEY=${CUSTOM_KEY}
+INSTALLED_AT=$(date '+%F %T')
+META
+}
+
+mkdir -p "${TRIM_PKGETC}" 2>/dev/null
+write_meta "${TRIM_PKGETC}/info.txt" 2>/dev/null
+
+# 信息页目录在应用安装目录下，属主是应用用户，可以直接写
+mkdir -p "${TRIM_APPDEST}/docker/info" 2>/dev/null
+write_meta "${TRIM_APPDEST}/docker/info/meta.txt" 2>/dev/null
+
+log "install_callback: data=${DATA_DIR} relay=${RELAY_HOST:-auto} force_relay=${FORCE_RELAY} key=${CUSTOM_KEY}"
+
+exit 0

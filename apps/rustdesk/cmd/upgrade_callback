@@ -1,0 +1,20 @@
+#!/bin/bash
+# 升级后：把配置目录里留存的 info.txt 恢复到信息页目录。
+# 升级会整体替换应用安装目录，meta.txt 会随之丢失，
+# 而 PKGETC 下的 info.txt 是持久的，据此还原即可让页面继续显示正确信息。
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+SRC="${TRIM_PKGETC}/info.txt"
+DST="${TRIM_APPDEST}/docker/info/meta.txt"
+
+if [ -f "$SRC" ]; then
+    mkdir -p "${TRIM_APPDEST}/docker/info" 2>/dev/null
+    cp "$SRC" "$DST" 2>/dev/null
+    log "upgrade_callback: 已从 ${SRC} 恢复信息页配置"
+else
+    log "upgrade_callback: 未找到 ${SRC}，信息页将回退到按主机名显示"
+fi
+
+exit 0

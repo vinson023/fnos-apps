@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "rustdesk.main": {
+            "title": "RustDesk 服务器信息",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "21120",
+            "url": "/",
+            "width": 900,
+            "height": 760,
+            "allUsers": false
+        }
+    }
+}

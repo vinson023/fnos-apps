@@ -1,0 +1,9 @@
+#!/bin/bash
+# 卸载清理。
+# 数据目录（含密钥）属主是 root，应用用户删不掉，因此这里只记录日志；
+# 需要连数据一起清掉时请手动执行 rm -rf <数据目录>。
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+D="$(dirname "$0")"
+[ -f "$D/_common.sh" ] && . "$D/_common.sh"
+log "uninstall_callback: 应用已卸载，数据目录保留在 $(wiz wizard_data_dir "${FNOS_DATA_DIR:-/vol1/1000/docker}/rustdesk" 2>/dev/null)"
+exit 0

@@ -1,0 +1,30 @@
+#!/bin/bash
+# 安装前检查：确认 RustDesk 需要的端口没有被别的服务占用。
+# 这一步在应用文件落地之前执行，只做只读检查。
+# 注意：不要在这里碰 docker —— 生命周期脚本以应用用户运行，没有 docker 权限。
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
+[ -f "${DIR}/_common.sh" ] && . "${DIR}/_common.sh"
+
+PORTS="21115 21116 21117 21118 21119 ${INFO_PORT:-21120}"
+
+used="$(ss -tuln 2>/dev/null | awk 'NR>1 {print $5}' | sed 's/.*://' | sort -u)"
+busy=""
+for p in $PORTS; do
+    if printf '%s\n' "$used" | grep -qx "$p"; then
+        busy="${busy} ${p}"
+    fi
+done
+
+if [ -n "$busy" ]; then
+    {
+        echo "以下端口已被占用，RustDesk 服务端无法启动：${busy}"
+        echo ""
+        echo "其中 21116 需要 TCP 与 UDP 同时可用。"
+        echo "请先停掉占用这些端口的服务（例如已有的 RustDesk 容器），再重新安装。"
+    } > "${TRIM_TEMP_LOGFILE}"
+    exit 1
+fi
+
+exit 0

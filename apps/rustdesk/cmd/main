@@ -1,0 +1,33 @@
+#!/bin/bash
+# 运行控制。
+#
+# 容器的启动/停止由 fnOS 依据 config/resource 里声明的 docker-project 处理，
+# 应用中心也自己通过 Docker API 判断运行状态，所以这里的 start/stop 不需要做事。
+# 但 status 仍按文档返回一个真实结果：用「21116 是否在监听」来判断，
+# 因为脚本以应用用户运行、连不上 docker.sock，没法用 docker inspect。
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+case "$1" in
+start)
+    exit 0
+    ;;
+
+stop)
+    exit 0
+    ;;
+
+status)
+    # hbbs 监听 21116（TCP+UDP），它是本应用的核心服务
+    if ss -tuln 2>/dev/null | awk 'NR>1 {print $5}' | sed 's/.*://' | grep -qx "21116"; then
+        exit 0
+    fi
+    exit 3
+    ;;
+
+*)
+    echo "用法: $0 {start|stop|status}" > "${TRIM_TEMP_LOGFILE}"
+    exit 1
+    ;;
+esac

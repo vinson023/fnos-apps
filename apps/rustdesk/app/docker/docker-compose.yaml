@@ -1,0 +1,53 @@
+services:
+  hbbs:
+    # ID / 信令服务器：客户端注册、心跳、NAT 类型检测
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-hbbs
+    # host 模式：客户端真实 IP 不丢，NAT 穿透成功率更高，也不必逐个映射端口
+    network_mode: host
+    # 中继地址用 -r 参数传递，这是唯一有效的方式：
+    # 实测 RELAY-SERVERS 环境变量在这个镜像里不生效，只有命令行参数会被解析。
+    # 留空时拼出来是 "-r :21117"，hbbs 会把它解析成空值，等同于不指定、
+    # 由 hbbs 自行判断 —— 所以这里不需要在 compose 里做条件判断。
+    command: hbbs -r ${wizard_relay_host}:21117
+    environment:
+      # 密钥。- 表示由 hbbs 首次启动时自动生成 ed25519 密钥对，
+      # 生成结果落在下面挂载的 /root 目录里
+      - KEY=${wizard_key}
+      # Y 表示禁用 P2P 直连、全部走中继
+      - ALWAYS_USE_RELAY=${wizard_force_relay}
+      - TZ=Asia/Shanghai
+    volumes:
+      # 安装向导里选的数据目录，密钥与数据库都在这里
+      - ${wizard_data_dir}/data:/root
+    restart: unless-stopped
+    depends_on:
+      - hbbr
+
+  hbbr:
+    # 中继服务器：P2P 打洞失败时转发流量
+    image: rustdesk/rustdesk-server:latest
+    container_name: rustdesk-hbbr
+    network_mode: host
+    command: hbbr
+    environment:
+      # 与 hbbs 共用同一密钥；为 - 时从共享的数据目录读取已生成的密钥对
+      - KEY=${wizard_key}
+      - TZ=Asia/Shanghai
+    volumes:
+      - ${wizard_data_dir}/data:/root
+    restart: unless-stopped
+
+  info:
+    # 信息页：从桌面图标打开，展示服务器地址、公钥与端口清单
+    image: nginx:alpine
+    container_name: rustdesk-info
+    network_mode: host
+    volumes:
+      # 静态页面、nginx 配置与安装时写入的 meta.txt 都在这里，来自应用包本身
+      - ${TRIM_APPDEST}/docker/info:/usr/share/nginx/html:ro
+      - ${TRIM_APPDEST}/docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 只读挂载密钥目录，供页面读取公钥 id_ed25519.pub。
+      # 私钥虽然在同目录，但 nginx 只开放了指向公钥的那一条路由
+      - ${wizard_data_dir}/data:/keys:ro
+    restart: unless-stopped

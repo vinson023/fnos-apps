@@ -15,6 +15,7 @@
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 |
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 |
 | MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 |
+| RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 |
 
 ## 仓库结构
 
@@ -141,6 +142,34 @@ Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
    想让成品直接进媒体库，把这条挂载改到 `$MEDIA_DIR` 之类的位置即可；
    `TEMP_DIR` 与 `DOWNLOAD_DIR` 保持同一磁盘可避免合并时跨设备拷贝。
 
+## RustDesk Server：安装向导如何影响 compose
+
+这是本仓库里唯一一个**在安装向导里选参数、装完 compose 自动按选择生效**的应用。
+向导四个字段（`wizard_data_dir` / `wizard_relay_host` / `wizard_key` / `wizard_force_relay`）
+写在 `wizard/install` 里，compose 里对应写 `${wizard_data_dir}` 这类占位符——
+**fnOS 会在创建容器前把向导值替换进去**，这是让向导影响 compose 的唯一有效途径。
+在 `install_callback` 里改写 compose 文件是没用的，容器在回调之前就已经按原 compose 建好了。
+
+配套的四个坑：
+
+1. **必须声明 `docker-project`**。生命周期脚本以「应用用户」身份运行（没有 docker 权限，
+   `/var/run/docker.sock` 是 `root:docker 660`），在 `install_callback` 里 `docker compose up`
+   必然失败，表现为安装报 `code 10237: Docker 服务未运行或无权限访问`。
+   正确做法是让 fnOS 通过 Docker API 管容器，回调只负责写配置。
+2. **`RELAY-SERVERS` 环境变量不生效**。实测 `RELAY-SERVERS` 与 `RELAY_SERVERS` 两种写法，
+   日志里都是 `relay-servers=[]`；只有命令行 `hbbs -r <host>:21117` 会被解析。
+3. **`-r` 会解析主机名，不可解析的域名被静默忽略**（`-r rd.example.com:21117` → `[]`）。
+   所以填中继地址时该地址必须能被本机 DNS 解析，否则等于没填，而日志看起来「正常」。
+   留空时拼出来是 `-r :21117`，hbbs 会把它当空值忽略，因此 compose 里不需要做条件判断。
+4. **自定义 `KEY` 时不生成 `id_ed25519.pub`**。`KEY=-` / `_` 才由 hbbs 首次启动生成密钥对；
+   填了自定义 KEY 后，信息页的 `/key` 路由会返回纯文本 404，页面改从 `/meta.txt` 里的配置值显示。
+
+信息页是包内自带的静态页（nginx:alpine 托管，端口 21120），
+展示 ID 服务器 / 中继 / Key / 端口清单，`nginx.conf` 只开放指向**公钥**的那一条路由，
+私钥虽在同一挂载目录下但没有任何路由可读。安装时写入的配置存在两处：
+`$PKGETC/info.txt`（持久，供排查）与 `$APPDEST/docker/info/meta.txt`（供页面 fetch，
+因为配置目录的 ACL 让 nginx worker 读不到）。
+
 ## 关于第三方代码
 
 `apps/ariang/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) 的发行版
@@ -154,6 +183,8 @@ Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
 - 移除硬编码的 aria2 RPC 密钥（原为固定字符串），改为空值 + `ARIA2_SECRET` 可选项；
 - 主机绝对路径（`/vol1/1000/...`）改为 `${FNOS_DATA_DIR:-...}` / `${MEDIA_DIR:-...}` 形式，
   默认值与 fnOS 默认布局一致，因此行为不变但不再绑定具体机器；
+  例外是 RustDesk 安装向导的 `initValue`——向导字段只接受字面量，无法引用环境变量，
+  所以那里保留 fnOS 标准路径作为默认值，安装时可随时改成自己的路径；
 - 剔除构建产物（`*.fpk`、`app.tgz`）与个人目录结构信息。
 
 ## 免责声明

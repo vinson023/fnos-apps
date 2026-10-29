@@ -1,0 +1,84 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "本应用部署 RustDesk 自建服务器，包含 <b>hbbs</b>（ID / 信令服务器）、<b>hbbr</b>（中继服务器），另附一个本地信息页，用来查看公钥和需要放行的端口。<br><br><b>使用 host 网络模式</b>，会直接占用宿主机以下端口，请确认未被占用：<br>21115/TCP（NAT 类型检测）<br>21116/TCP + 21116/UDP（ID 注册与心跳，<b>两个协议都要放行</b>）<br>21117/TCP（中继）<br>21118/TCP、21119/TCP（Web 客户端，不用可在外层防火墙关闭）<br>21120/TCP（本应用的信息页）<br><br>只在局域网内使用的话，装完即可用；要让外网客户端连进来，需要路由器做端口映射，并把下面「中继地址」填成公网域名或 IP。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "存储与网络",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "数据目录",
+                "initValue": "/vol1/1000/docker/rustdesk",
+                "description": "密钥、数据库与运行配置都存放在这里（其下的 data 子目录）。填绝对路径，目录不存在会自动创建。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写数据目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_relay_host",
+                "label": "中继地址（可留空）",
+                "description": "客户端拿到的中继地址，只填域名或 IP，不要带 http:// 和端口（端口固定 21117）。留空表示由 hbbs 自动判断，中继与本服务在同一台机器时用这个即可。外网访问请填公网域名或公网 IP，注意该地址必须能被本机 DNS 解析，否则 hbbs 会静默忽略。",
+                "rules": [
+                    {
+                        "pattern": "^$|^[A-Za-z0-9._-]+$",
+                        "message": "只能填域名或 IP，不要带 http:// 和端口"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "stepTitle": "密钥与连接",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_key",
+                "label": "密钥",
+                "initValue": "-",
+                "description": "保持 - 表示由 hbbs 首次启动时自动生成 ed25519 密钥对，装完可在信息页直接复制公钥。也可以填自己的密钥，那样所有客户端都必须用同一个。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "保持 - 自动生成，或填写自己的密钥"
+                    },
+                    {
+                        "pattern": "^[-_]$|^[A-Za-z0-9._-]{6,64}$",
+                        "message": "填 - 自动生成，或填 6-64 位的字母、数字、点、下划线、短横线"
+                    }
+                ]
+            },
+            {
+                "type": "radio",
+                "field": "wizard_force_relay",
+                "label": "强制走中继",
+                "initValue": "N",
+                "description": "开启后禁用 P2P 直连，所有流量经中继转发。某些网络环境下连接更稳定，但会明显增加中继带宽消耗。",
+                "options": [
+                    {
+                        "label": "否，优先 P2P 直连（推荐）",
+                        "value": "N"
+                    },
+                    {
+                        "label": "是，全部走中继",
+                        "value": "Y"
+                    }
+                ]
+            }
+        ]
+    }
+]

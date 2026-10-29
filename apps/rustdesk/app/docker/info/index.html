@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RustDesk Server</title>
+<style>
+  :root {
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --line: #e3e8f0;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --accent: #0a84ff;
+    --ok: #16a34a;
+    --warn: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(22,163,74,.15); flex: 0 0 auto; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 13px; margin: 0 0 14px; color: var(--muted); font-weight: 600; letter-spacing: .6px; text-transform: uppercase; }
+  .row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; padding-top: 0; }
+  .k { flex: 0 0 118px; color: var(--muted); font-size: 13px; padding-top: 2px; }
+  .v { flex: 1 1 auto; min-width: 0; font-size: 14px; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .v.plain { font-family: inherit; }
+  .v.pending { color: var(--warn); font-family: inherit; font-size: 13px; }
+  button.copy {
+    flex: 0 0 auto; border: 1px solid var(--line); background: #fff; color: var(--accent);
+    border-radius: 7px; padding: 4px 11px; font-size: 12px; cursor: pointer; transition: .15s;
+  }
+  button.copy:hover { background: #eef5ff; border-color: #bcd8ff; }
+  button.copy.done { color: var(--ok); border-color: #b7e4c7; background: #f0fdf4; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td.p { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #eef2f7; color: var(--muted); white-space: nowrap; }
+  ol { margin: 0; padding-left: 20px; font-size: 14px; }
+  ol li { margin: 6px 0; }
+  code { background: #eef2f7; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 26px; line-height: 1.8; }
+  @media (max-width: 520px) {
+    .row { flex-wrap: wrap; }
+    .k { flex-basis: 100%; padding-top: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="dot"></span>
+    <div>
+      <h1>RustDesk Server</h1>
+      <p class="sub">自建 ID / 中继服务器 · 开源版</p>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>客户端填写</h2>
+    <div class="row">
+      <div class="k">ID 服务器</div>
+      <div class="v" id="host">&nbsp;</div>
+      <button class="copy" data-copy="host">复制</button>
+    </div>
+    <div class="row">
+      <div class="k">中继服务器</div>
+      <div class="v" id="relay">&nbsp;</div>
+      <button class="copy" data-copy="relay">复制</button>
+    </div>
+    <div class="row">
+      <div class="k">Key</div>
+      <div class="v pending" id="key">读取中…</div>
+      <button class="copy" data-copy="key">复制</button>
+    </div>
+    <div class="row">
+      <div class="k">强制中继</div>
+      <div class="v plain" id="force">—</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>需要放行的端口</h2>
+    <table>
+      <thead>
+        <tr><th>端口</th><th>协议</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="p">21115</td><td><span class="tag">TCP</span></td><td>NAT 类型检测</td></tr>
+        <tr><td class="p">21116</td><td><span class="tag">TCP + UDP</span></td><td>ID 注册与心跳，两个协议都要开</td></tr>
+        <tr><td class="p">21117</td><td><span class="tag">TCP</span></td><td>中继转发</td></tr>
+        <tr><td class="p">21118</td><td><span class="tag">TCP</span></td><td>Web 客户端（不用可关闭）</td></tr>
+        <tr><td class="p">21119</td><td><span class="tag">TCP</span></td><td>Web 客户端中继（不用可关闭）</td></tr>
+        <tr><td class="p">21120</td><td><span class="tag">TCP</span></td><td>本信息页</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>客户端怎么配</h2>
+    <ol>
+      <li>打开 RustDesk 客户端，进入 <code>设置 → 网络</code>。</li>
+      <li>勾选「启用 ID 服务器」，填入上面的 ID 服务器地址。</li>
+      <li>勾选「启用中继服务器」，填入上面的中继服务器地址。</li>
+      <li>把 Key 粘贴到「Key」输入框，保存后回到主界面。</li>
+      <li>主界面左下角显示「就绪」即代表已连上自建服务器。</li>
+    </ol>
+  </section>
+
+  <footer>
+    数据目录 <code id="datadir">—</code><br>
+    密钥文件 id_ed25519 / id_ed25519.pub 保存在该目录的 data 子目录中
+  </footer>
+</div>
+
+<script>
+(function () {
+  var host = location.hostname || "127.0.0.1";
+  var relayPort = 21117;
+
+  document.getElementById("host").textContent = host;
+  document.getElementById("relay").textContent = host + ":" + relayPort;
+
+  function setText(id, text, pending) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    if (pending) { el.classList.add("pending"); } else { el.classList.remove("pending"); }
+  }
+
+  // 读取安装时写入的实际配置（meta.txt），用于显示真实的中继地址与数据目录
+  var configuredKey = "";
+  var metaDone = fetch("/meta.txt", { cache: "no-store" }).then(function (r) {
+    if (!r.ok) throw new Error("no meta");
+    return r.text();
+  }).then(function (text) {
+    var map = {};
+    text.split("\n").forEach(function (line) {
+      var i = line.indexOf("=");
+      if (i > 0) map[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    });
+    var relay = map.RELAY_HOST || "";
+    if (relay) {
+      document.getElementById("relay").textContent = relay.indexOf(":") > -1 ? relay : relay + ":" + relayPort;
+    }
+    if (map.DATA_DIR) {
+      document.getElementById("datadir").textContent = map.DATA_DIR;
+    }
+    setText("force", map.FORCE_RELAY === "Y" ? "已开启（全部流量经中继）" : "未开启（优先 P2P 直连）", false);
+
+    // 用户自定义了密钥时，客户端要用的是这个字符串，
+    // 而不是 hbbs 自动生成的公钥文件，所以这里优先用配置值
+    var k = map.KEY || "";
+    if (k && k !== "-" && k !== "_") {
+      configuredKey = k;
+    }
+  }).catch(function () {
+    // meta.txt 缺失时不影响主流程，地址按当前访问的主机名显示
+  });
+
+  // 公钥由 hbbs 首次启动时生成，可能比页面晚几秒
+  function loadKey(attempt) {
+    fetch("/key", { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("no key");
+      return r.text();
+    }).then(function (text) {
+      var key = text.trim();
+      if (key) {
+        setText("key", key, false);
+      } else if (attempt < 10) {
+        setTimeout(function () { loadKey(attempt + 1); }, 2000);
+      } else {
+        setText("key", "尚未生成，请稍后刷新本页", true);
+      }
+    }).catch(function () {
+      if (attempt < 10) {
+        setText("key", "等待 hbbs 生成密钥…（" + (attempt + 1) + "/10）", true);
+        setTimeout(function () { loadKey(attempt + 1); }, 2000);
+      } else {
+        setText("key", "尚未生成，请稍后刷新本页", true);
+      }
+    });
+  }
+
+  metaDone.then(function () {
+    if (configuredKey) {
+      setText("key", configuredKey, false);
+    } else {
+      loadKey(0);
+    }
+  });
+
+  document.querySelectorAll("button.copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var el = document.getElementById(btn.getAttribute("data-copy"));
+      if (!el) return;
+      var text = el.textContent.trim();
+      if (!text || el.classList.contains("pending")) return;
+      var done = function () {
+        var old = btn.textContent;
+        btn.textContent = "已复制";
+        btn.classList.add("done");
+        setTimeout(function () { btn.textContent = old; btn.classList.remove("done"); }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
