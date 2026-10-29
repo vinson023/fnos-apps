@@ -31,6 +31,12 @@ services:
       - "/"
       - "--title"
       - "WeTTY 终端"
+      # 必须加：WeTTY 默认用 helmet 下发 X-Frame-Options: SAMEORIGIN。
+      # 飞牛桌面在 5666 端口、本应用在 3002，端口不同就是跨源，浏览器会直接拒绝嵌套，
+      # 桌面窗口里只剩灰色底 + 一个「破损文件」图标。--bypasshelmet 是官方提供的关闭开关。
+      # 代价是同时失去 nosniff / XSS-Protection 等响应头，对终端页面影响很小
+      # （页面只有本地 xterm.js，不加载任何外部资源）。
+      - "--bypasshelmet"
       # 注意：WeTTY 的 --command 是在「容器内本地执行」的命令，不走它自带的 ssh 逻辑。
       # 自带的 ssh 只服务于默认的 login 流程，而那条路会在 ssh 之后再跑一次 login，
       # 在飞牛上任何账号都会被判 Login incorrect。所以这里用脚本自己 exec ssh。

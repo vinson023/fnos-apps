@@ -425,7 +425,7 @@ device-code 远程配对。
 另外两点实现细节：入口脚本自带 `tini`，compose 里**不能**再加 `init: true`（会变成双份 init）；
 `PUID`/`PGID` 默认 0，想改成普通用户直接改这两个值即可，入口脚本会自动 chown `/config`。
 
-## WeTTY 的四个注意点
+## WeTTY 的五个注意点
 
 1. **它自己没有 shell，也没有登录页**。真正的 shell 来自飞牛自己的 sshd：
    浏览器 ↔ WeTTY ↔ `ssh 127.0.0.1:22` ↔ NAS。所以 NAS 的 SSH 必须开着，
@@ -447,7 +447,19 @@ device-code 远程配对。
    `fnpack` 会保留源文件权限，所以出包前要在 NAS 上 `chmod 755`（见 `scripts/` 里的说明）；
    `install_callback` / `upgrade_callback` 里也会再 chmod 一次兜底。
 
-4. **必须 host 网络**。只有 host 模式下容器内的 `127.0.0.1` 才指向宿主机，
+4. **必须加 `--bypasshelmet`，否则桌面窗口里是灰屏**。WeTTY 默认用 helmet 下发
+   `X-Frame-Options: SAMEORIGIN`。飞牛桌面在 `5666`、本应用在 `3002`，端口不同就是跨源，
+   浏览器直接拒绝嵌套，`ui/config` 里 `type: iframe` 的窗口只剩一块灰底加一个
+   「破损文件」图标（页面本身没问题，直接用浏览器打开 3002 是正常的）。
+   `--bypasshelmet` 是上游提供的关闭开关，加上之后响应头里不再有 `X-Frame-Options`。
+
+   代价是同时失去 `X-Content-Type-Options`、`X-XSS-Protection` 等 helmet 头。对终端页影响很小
+   ——页面只有本地 xterm.js，不加载任何外部资源。要更精细就自己加一层 nginx 反代只剥这一个头。
+
+   **改完必须强刷一次**：HTML 内容没变，`ETag` 就不变，浏览器会沿用缓存里的旧响应头，
+   表现是「明明改好了、桌面里还是灰屏」。`Ctrl+F5` 或清站点数据即可。
+
+5. **必须 host 网络**。只有 host 模式下容器内的 `127.0.0.1` 才指向宿主机，
    ssh 才登得进飞牛本身；桥接模式下 `127.0.0.1` 是容器自己，必然连不上。
    代价是 3002 直接占用宿主机端口（与 `manifest` 的 `service_port`、`ui/config` 的 `port` 三处一致）。
 
