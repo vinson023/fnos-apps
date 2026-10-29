@@ -4,7 +4,7 @@
         "items": [
             {
                 "type": "tips",
-                "helpText": "本应用只是 <b>aria2 的 Web 前端（AriaNg）</b>，本身不下载任何东西，也不自带 aria2 守护进程。装之前请确认 aria2 已经在运行，否则页面能打开但一直显示「未连接」。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>6880/TCP</b>。页面里对 aria2 的请求走同源反代（<b>/aria2/jsonrpc</b>），因此内网 IP、外网域名、IPv4/IPv6 都共用同一份配置，不用在 AriaNg 里写死地址。<br><br>下面一步决定这个反代指向哪里。aria2 就在同一台机器上时，保持默认即可。"
+                "helpText": "本应用只是 <b>aria2 的 Web 前端（AriaNg）</b>，本身不下载任何东西，也不自带 aria2 守护进程。装之前请确认 aria2 已经在运行，否则页面能打开但一直显示「未连接」。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>6880/TCP</b>。页面里对 aria2 的请求走同源反代（<b>/aria2/jsonrpc</b>），因此内网 IP、外网域名、IPv4/IPv6 都共用同一份配置，不用在 AriaNg 里写死地址。<br><br>下面一步决定这个反代指向哪里、以及用哪个密钥连它。aria2 就在同一台机器上时，保持默认即可。"
             }
         ]
     },
@@ -29,8 +29,24 @@
                 ]
             },
             {
+                "type": "password",
+                "field": "wizard_aria2_secret",
+                "label": "aria2 RPC 密钥",
+                "description": "aria2 配置里的 rpc-secret。没改过就是 aria2 的出厂值 123456。填在这里的好处是：打开页面时自动带上，不用每次换设备都手动填一遍；而且密钥只存在容器环境变量里，不会出现在随包分发的静态文件中。装完之后仍然可以在「AriaNg 设置 → RPC 密钥」里改，改了会保存在浏览器里。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写 aria2 的 RPC 密钥"
+                    },
+                    {
+                        "pattern": "^[A-Za-z0-9._~+/=-]{1,64}$",
+                        "message": "密钥只能是字母、数字和 . _ ~ + / = - 这些字符"
+                    }
+                ]
+            },
+            {
                 "type": "tips",
-                "helpText": "RPC 密钥（aria2 的 <b>rpc-secret</b>）不在这里填：它保存在浏览器的 localStorage 里，首次打开 AriaNg 后到「AriaNg 设置 → RPC 密钥」填一次即可，之后换设备需要重填。这样发布包里不会出现任何明文密钥。"
+                "helpText": "这一步填的密钥会由 nginx 通过 <b>/aria2/config.js</b> 下发给页面，只用来在浏览器还没有存过密钥时补一个默认值。<b>在 AriaNg 里手动改过的密钥不会被覆盖</b>，会一直保存在该浏览器的 localStorage 里。"
             }
         ]
     }

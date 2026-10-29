@@ -1,5 +1,5 @@
 appname=ariang
-version=1.0.3
+version=1.0.4
 display_name=Aria2 Pro
 desc=Aria2 Pro 下载器的 Web 控制台（AriaNg），用于查看和管理 aria2 下载任务。
 source=thirdparty

@@ -14,10 +14,14 @@ services:
       # aria2 的 RPC 地址（主机:端口），来自安装向导。
       # 供 nginx 启动时的 envsubst 使用，替换模板里的 ${ARIA2_RPC}
       - ARIA2_RPC=${wizard_aria2_rpc}
-      # envsubst 白名单：只替换 ARIA2_RPC 这一个变量。
+      # aria2 的 RPC 密钥，同样来自安装向导。
+      # 由 /aria2/config.js 端点下发给前端，作为「用户还没填过密钥」时的默认值；
+      # 这样密钥只存在于容器环境变量里，静态文件（和发布包）里看不到明文
+      - ARIA2_SECRET=${wizard_aria2_secret}
+      # envsubst 白名单：只替换这两个变量。
       # 不加这行的话，模板里的 $remote_addr / $uri / $scheme 等 nginx 内置变量
       # 会被一并替换成空值，配置直接失效
-      - NGINX_ENVSUBST_FILTER=ARIA2_RPC
+      - NGINX_ENVSUBST_FILTER=ARIA2_RPC|ARIA2_SECRET
     volumes:
       # AriaNg 静态站随包分发，不依赖宿主机外部目录。
       # ${TRIM_APPDEST} 是 fnOS 注入的安装路径，实际为 /vol1/@appcenter/ariang

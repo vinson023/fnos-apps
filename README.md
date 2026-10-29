@@ -10,7 +10,7 @@
 
 | 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 | 安装向导可配置 |
 |---|---|---|---|---|---|
-| Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | aria2 RPC 地址 |
+| Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | aria2 RPC 地址与密钥 |
 | Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 | 配置目录、媒体库目录 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 下载目录、数据目录 |
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
@@ -127,6 +127,7 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 | 应用 | 向导字段 | 默认值 | 容器内 |
 |---|---|---|---|
 | `ariang` | `wizard_aria2_rpc` | `127.0.0.1:6800` | 反代目标，非挂载 |
+| `ariang` | `wizard_aria2_secret` | 无（必须自己设） | 经 `/aria2/config.js` 下发给前端，非挂载 |
 | `emby` | `wizard_data_dir` | `/vol1/1000/docker/emby` | `/config`（其下 `config` 子目录） |
 | `emby` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
 | `music-dl` | `wizard_download_dir` | `/vol1/1000/Download` | `/home/appuser/data/downloads` |
@@ -179,20 +180,50 @@ trim_sac.entry.open_type        ← 展示层
    这样内网 IP、外网域名、IPv4/IPv6 都共用同一个相对地址，不需要在 AriaNg 里写死主机。
 
    模板里的 `${ARIA2_RPC}` 由容器启动时 nginx 镜像自带的 envsubst 渲染成实际值。
-   注意必须同时设 `NGINX_ENVSUBST_FILTER=ARIA2_RPC` 白名单：不加的话，模板里的
+   注意必须同时设 `NGINX_ENVSUBST_FILTER=ARIA2_RPC|ARIA2_SECRET` 白名单：不加的话，模板里的
    `$remote_addr` / `$uri` / `$scheme` 这些 nginx 内置变量会被一并替换成空值，配置直接失效。
-2. **RPC 密钥不随包分发**。首次打开 AriaNg 后到 `AriaNg 设置 → RPC 密钥` 填一次，
-   配置存在浏览器 localStorage（按 origin 隔离，换域名要重填）。
-   也可以在自己的副本里改 `apps/ariang/app/docker/html/index.html`、在注入脚本之前加一行
-   `window.ARIA2_SECRET='你的密钥';` 随包固化——但那是明文提交，不适合放进公开仓库。
-3. **语言与 RPC 自愈**：AriaNg 的偏好存在 localStorage 里，而 localStorage 按 origin 隔离——
-   换一个域名访问就是一份全新的空配置，会回落到英文且 RPC 地址为空（表现为「未连接」）。
-   因此对 `aria-ng-*.min.js` 打了三处函数级补丁（标记 `ARIANG_LOCK_ZH`）：
-   - 语言固定为中文，不再跟随浏览器语言；
-   - 已有配置一律强制改写 language；
-   - `T()` 从 `location` 推导 rpcHost/rpcPort/protocol/interface，避免空值卡死。
+2. **RPC 密钥由向导注入、服务端下发，静态文件里没有明文**。
+   向导里的 `wizard_aria2_secret` 变成容器环境变量 `ARIA2_SECRET`，再由 nginx 的
+   `/aria2/config.js` 端点以 `window.ARIA2_SECRET="..."` 的形式下发给页面：
+
+   ```nginx
+   location = /aria2/config.js {
+       default_type application/javascript;
+       add_header Cache-Control "no-store";
+       return 200 'window.ARIA2_SECRET="${ARIA2_SECRET}";';
+   }
+   ```
+
+   `index.html` 在 `<head>` 最前面加载这个脚本。于是密钥只存在于容器环境变量里，
+   随包分发的 `index.html` 和 `aria-ng-*.min.js` 都不含明文——公开仓库可以直接放源码。
+3. **默认值只补缺失，绝不覆盖用户改过的值**。
+   AriaNg 的偏好存在 localStorage（按 origin 隔离），换域名访问就是一份空配置。
+   为了「换设备/换域名也能直接用」，对 `aria-ng-*.min.js` 打了函数级补丁（标记 `ARIANG_FILL_MISSING`）：
+
+   ```js
+   T = function(e){
+       e.rpcHost      || (e.rpcHost = location.host() || defaultHost);
+       e.rpcPort      || (e.rpcPort = String(location.port() || (https ? 443 : 80)));
+       e.rpcInterface || (e.rpcInterface = "aria2/jsonrpc");
+       e.protocol     || (e.protocol = https ? "https" : "http");
+       !e.secret && window.ARIA2_SECRET && (e.secret = btoa(window.ARIA2_SECRET));
+   }
+   ```
+
+   **关键点是每个字段都带 `||` 前置判断**：只有空值才填，用户在界面里改过的值原样保留。
+   早期版本这里是无条件赋值（`e.rpcHost = ...` 一直写到底），结果每次加载配置都把用户的
+   修改打回去，表现为「RPC 改不了、新建的 RPC 也存不住」。同时 `w()` 里那句
+   `t.language="zh_CN"` 也去掉了，语言只在没有存储值时取默认的 `zh_CN`。
 
    补丁在压缩产物上直接改，改完可用 `node --check` 验证语法。
+
+   **验证方法**（用 CDP 驱动无头 Chrome，比肉眼看可靠）：
+
+   | 场景 | 期望 |
+   |---|---|
+   | localStorage 清空 | 自动补上密钥，状态「已连接」 |
+   | 手填一个错密钥后刷新 | 密钥原样保留，报「认证失败」（说明没被覆盖） |
+   | 旧版遗留 `secret: ""` | 自动补回密钥，状态「已连接」 |
 
 ## MeTube 的三个注意点
 
@@ -314,6 +345,8 @@ device-code 远程配对。
 
 `apps/ariang/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) 的发行版
 （MIT License，原始许可证保留在 `html/LICENSE`），仅为离线自包含而内联进包。
+其中 `js/aria-ng-*.min.js` 打了函数级补丁（标记 `ARIANG_FILL_MISSING`，见上文「Aria2 Pro 的三个特殊处理」），
+只改 `ariaNgSettingService` 里的默认值填充函数与默认选项，其余字节与上游一致。
 
 `apps/motrix/app/docker/patch/app-settings-<hash>.js` 是 Motrix 官方镜像里
 `/app/dist/renderer-web/assets/` 下的同名前端 chunk，**仅替换了一个常量**
@@ -327,7 +360,8 @@ device-code 远程配对。
 
 本仓库由实际部署环境整理而来，发布前已做以下处理：
 
-- 移除硬编码的 aria2 RPC 密钥（原为固定字符串），改为空值 + `ARIA2_SECRET` 可选项；
+- aria2 RPC 密钥不再出现在任何静态文件里：`index.html` 与 `aria-ng-*.min.js` 都是空值，
+  密钥由安装向导填写，经容器环境变量 `ARIA2_SECRET` 由 nginx 的 `/aria2/config.js` 运行时下发；
 - 主机绝对路径不再写死在 compose 里，改为安装向导字段（`${wizard_data_dir}` 等），
   默认值与 fnOS 默认布局一致，因此行为不变但不再绑定具体机器；
 - 向导字段的 `initValue` 保留 fnOS 标准路径作为默认值——向导只接受字面量、

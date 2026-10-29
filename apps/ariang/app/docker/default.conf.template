@@ -13,6 +13,16 @@ server {
         expires -1;
     }
 
+    # 把 aria2 的 RPC 密钥下发给前端。
+    # 密钥由安装向导决定，只以环境变量形式存在于容器里，不写进任何随包分发的
+    # 静态文件——所以发布包可以公开，装完之后页面会自动带上本机的密钥。
+    # 前端只在自己没有存过密钥时才用它补默认值，用户在界面里改过的值不会被覆盖。
+    location = /aria2/config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-store";
+        return 200 'window.ARIA2_SECRET="${ARIA2_SECRET}";';
+    }
+
     # 同源反代到 aria2 的 JSON-RPC。
     # ARIA2_RPC 由安装向导决定，容器启动时 nginx 镜像会用 envsubst 把这一处
     # 占位符替换成实际值（只替换 ARIA2_RPC，$remote_addr / $uri 等 nginx
