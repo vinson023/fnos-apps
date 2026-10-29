@@ -1,10 +1,10 @@
 appname=rustdesk
-version=1.0.0
+version=1.0.1
 display_name=RustDesk Server
 desc=RustDesk 自建服务器（hbbs 信令 + hbbr 中继），安装时可自定义数据目录、中继地址与密钥。
 source=thirdparty
 platform=all
-maintainer=Custom
+maintainer=vinson023
 desktop_uidir=ui
 desktop_applaunchname=rustdesk.main
 service_port=21120
