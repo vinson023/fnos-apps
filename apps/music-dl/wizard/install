@@ -1,0 +1,50 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "Music-DL 用来搜索并下载音乐，带 Web 界面。<br><br>使用桥接网络，宿主机 <b>8099/TCP</b> 映射到容器内 8080，请确认未被占用。装好后从桌面图标打开即可使用。<br><br>下面两步决定文件放哪里：<b>下载目录</b>存下载好的音乐，<b>数据目录</b>存配置、缓存与日志。两者可以分开。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "存储位置",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_download_dir",
+                "label": "下载目录",
+                "initValue": "/vol1/1000/Download",
+                "description": "下载完成的音乐文件落在这里，会以 /home/appuser/data/downloads 挂进容器。填绝对路径，目录不存在会自动创建。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写下载目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "数据目录",
+                "initValue": "/vol1/1000/docker/music-dl",
+                "description": "配置、缓存与日志存放在这里，会以 /home/appuser/data 挂进容器。注意下载目录是它的子路径之外的另一处挂载，不要填成同一个目录。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写数据目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            }
+        ]
+    }
+]

@@ -26,10 +26,10 @@ services:
       # 下载中的临时文件目录。与成品同盘可避免合并时跨设备拷贝
       - TEMP_DIR=/downloads
     volumes:
-      # 下载成品目录（宿主机）
-      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/metube/downloads:/downloads
+      # 下载成品目录（宿主机）。安装向导里选的 wizard_download_dir
+      - ${wizard_download_dir}:/downloads
       # 配置与队列状态，删除会丢失下载历史与全部设置
-      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/metube/config:/config
+      - ${wizard_data_dir}/config:/config
       # 跟随宿主机时区
       - /etc/localtime:/etc/localtime:ro
     # 说明：此处不设 mem_limit 与 cap_drop。

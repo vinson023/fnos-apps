@@ -16,7 +16,7 @@ services:
       - PUID=0
       - PGID=0
     volumes:
-      # Emby 的配置、元数据、转码缓存，建议保留在 SSD 上
-      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/emby/config:/config
+      # Emby 的配置、元数据、转码缓存，建议保留在 SSD 上（安装向导里选的 wizard_data_dir）
+      - ${wizard_data_dir}/config:/config
       # 媒体库目录，只读也可，这里保持默认读写以便 Emby 整理文件
-      - ${MEDIA_DIR:-/vol1/1000/video}:/media
+      - ${wizard_media_dir}:/media

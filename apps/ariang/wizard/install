@@ -1,0 +1,37 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "本应用只是 <b>aria2 的 Web 前端（AriaNg）</b>，本身不下载任何东西，也不自带 aria2 守护进程。装之前请确认 aria2 已经在运行，否则页面能打开但一直显示「未连接」。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>6880/TCP</b>。页面里对 aria2 的请求走同源反代（<b>/aria2/jsonrpc</b>），因此内网 IP、外网域名、IPv4/IPv6 都共用同一份配置，不用在 AriaNg 里写死地址。<br><br>下面一步决定这个反代指向哪里。aria2 就在同一台机器上时，保持默认即可。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "aria2 连接",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_aria2_rpc",
+                "label": "aria2 RPC 地址",
+                "initValue": "127.0.0.1:6800",
+                "description": "格式为 主机:端口，不要带 http:// 和路径。只填主机与端口，反代会自动补上 /jsonrpc。aria2 在本机时填 127.0.0.1:6800；aria2 在别的机器上则填那台机器的 IP 或域名。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写 aria2 RPC 地址"
+                    },
+                    {
+                        "pattern": "^[A-Za-z0-9._-]+:[0-9]{1,5}$",
+                        "message": "格式应为 主机:端口，例如 127.0.0.1:6800，不要带 http:// 和路径"
+                    }
+                ]
+            },
+            {
+                "type": "tips",
+                "helpText": "RPC 密钥（aria2 的 <b>rpc-secret</b>）不在这里填：它保存在浏览器的 localStorage 里，首次打开 AriaNg 后到「AriaNg 设置 → RPC 密钥」填一次即可，之后换设备需要重填。这样发布包里不会出现任何明文密钥。"
+            }
+        ]
+    }
+]

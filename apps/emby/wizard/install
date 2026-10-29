@@ -1,0 +1,50 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "Emby 是媒体服务器，把本地影音文件整理成可在线播放、可远程访问的流媒体库。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>8096/TCP</b>。局域网自动发现（DLNA / 投屏）依赖 host 模式，改成桥接会让发现功能失效。<br><br>下面两步决定数据放哪里：<b>配置目录</b>存数据库、元数据与转码缓存（建议放 SSD），<b>媒体库目录</b>是你已有的影音文件夹。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "存储位置",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "配置目录",
+                "initValue": "/vol1/1000/docker/emby",
+                "description": "Emby 的配置、元数据与转码缓存存放在这里（其下的 config 子目录）。转码缓存读写频繁，建议放在 SSD 上。填绝对路径，目录不存在会自动创建。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写配置目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_media_dir",
+                "label": "媒体库目录",
+                "initValue": "/vol1/1000/video",
+                "description": "你的影音文件所在目录，会以 /media 挂进容器。默认读写挂载，方便 Emby 自动整理、重命名和刮削封面；只想让 Emby 读、不让它改文件的话，装完后在 compose 里给这条挂载加 :ro。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写媒体库目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            }
+        ]
+    }
+]

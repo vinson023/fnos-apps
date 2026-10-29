@@ -8,14 +8,16 @@
 
 ## 应用列表
 
-| 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 |
-|---|---|---|---|---|
-| Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 |
-| Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 |
-| Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 |
-| ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 |
-| MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 |
-| RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 |
+| 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 | 安装向导可配置 |
+|---|---|---|---|---|---|
+| Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | aria2 RPC 地址 |
+| Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 | 配置目录、媒体库目录 |
+| Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 下载目录、数据目录 |
+| ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
+| MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 配置目录、下载目录 |
+| RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
+
+**六个应用都带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 ## 仓库结构
 
@@ -29,12 +31,13 @@ apps/<appname>/
 │   │   └── images/         # 图标
 │   └── docker/
 │       ├── docker-compose.yaml
-│       └── ...             # 应用自有静态资源（如 ariang 的 html/ 与 nginx.conf）
+│       └── ...             # 应用自有静态资源（如 ariang 的 html/ 与 default.conf.template）
 ├── cmd/                    # 生命周期钩子，main 需处理 start/stop/status
 ├── config/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
-└── wizard/                 # 安装向导（可选）
+└── wizard/
+    └── install             # 安装向导（六个应用都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -72,6 +75,74 @@ appcenter-cli install-fpk ariang.fpk
 appcenter-cli start ariang
 ```
 
+**带向导的应用用命令行安装时必须传 `-e`**，且要包含全部向导字段，
+否则会直接报 `Something wrong with environment variables` 并拒绝安装（这反而是个安全网：
+不会出现路径为空、挂载落到 `/` 的情况）。文件格式是纯 `KEY=value`：
+
+```bash
+cat > a.env <<'EOF'
+wizard_data_dir=/vol1/1000/docker/emby
+wizard_media_dir=/vol1/1000/video
+EOF
+appcenter-cli install-fpk emby.fpk -e a.env
+```
+
+两个坑：**不能加 `export` 前缀**（会失败），**不能有空值**（会让 CLI 段错误崩溃，
+真实错误码要看 `/var/log/trim_app_center/error.log`）。在应用中心里点「手动安装」
+走图形向导则不需要关心这些。
+
+## 安装向导（wizard）
+
+向导定义在 `wizard/install`，是一个 JSON 数组，每个元素是一个步骤。控件类型有
+`text` / `password` / `radio` / `checkbox` / `select` / `switch` / `tips`，
+`field` 名**就是环境变量名**（不带 `TRIM_` 前缀）。
+
+让向导值真正影响容器的方式只有一条：
+
+```
+wizard/install 里的 field 名
+        ↓
+fnOS 在创建容器前，对 app/docker/docker-compose.yaml 做 ${wizard_xxx} 字符串替换
+        ↓
+volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选的路径上
+```
+
+关键点：**容器在 `install_callback` 之前就已经按 compose 建好了**，
+所以在回调脚本里改写 compose 文件是无效的，必须用 `${wizard_xxx}` 占位符。
+
+每个 `text` 字段都配了 `required` + `pattern` 规则（只允许绝对路径、禁止空格），
+目的是挡住会导致挂载异常的值。`pattern` 里**不能允许空格**——中继地址这类值会被
+当成参数传给容器内的进程，带空格可能被拆成多个参数。
+
+容器由 fnOS 通过 Docker API 管理（`config/resource` 里的 `docker-project` 段），
+生命周期脚本以「应用用户」身份运行、**没有 docker 权限**，所以不要在回调里
+`docker compose up`，会报 `code 10237: Docker 服务未运行或无权限访问`。
+
+## 各应用的挂载点
+
+路径都在安装向导里选，默认值与 fnOS 标准布局一致：
+
+| 应用 | 向导字段 | 默认值 | 容器内 |
+|---|---|---|---|
+| `ariang` | `wizard_aria2_rpc` | `127.0.0.1:6800` | 反代目标，非挂载 |
+| `emby` | `wizard_data_dir` | `/vol1/1000/docker/emby` | `/config`（其下 `config` 子目录） |
+| `emby` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
+| `music-dl` | `wizard_download_dir` | `/vol1/1000/Download` | `/home/appuser/data/downloads` |
+| `music-dl` | `wizard_data_dir` | `/vol1/1000/docker/music-dl` | `/home/appuser/data` |
+| `video-download-reclip` | `wizard_data_dir` | `/vol1/1000/docker/reclip` | `/app/data`（其下 `reclip_data` 子目录） |
+| `metube` | `wizard_data_dir` | `/vol1/1000/docker/metube` | `/config`（其下 `config` 子目录） |
+| `metube` | `wizard_download_dir` | `/vol1/1000/docker/metube/downloads` | `/downloads` |
+| `rustdesk` | 四个字段 | 见下 | 见下 |
+
+Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
+
+| 宿主机 | 容器内 | 用途 |
+|---|---|---|
+| `wizard_download_dir` | `/home/appuser/data/downloads` | 下载的音乐文件 |
+| `wizard_data_dir` | `/home/appuser/data` | 配置、缓存、日志 |
+
+镜像里**没有** `/app/data` 这个路径，挂到那里数据不会被读到。
+
 ## 桌面打开方式（iframe / 新页签）
 
 由 `app/ui/config` 里 `.url.<id>.type` 决定：
@@ -91,36 +162,20 @@ trim_sac.entry.open_type        ← 展示层
 **重新安装 fpk 时包里的 `ui/config` 会写回数据库**——所以源码里的值必须和期望一致，
 否则每次重装都会被打回。本项目曾因 Emby 源码里遗留 `iframe` 而反复变回窗口模式。
 
-## 可配置项
+## Aria2 Pro 的三个特殊处理
 
-数据目录默认取 fnOS 标准路径，可用环境变量覆盖：
-
-| 变量 | 默认值 | 作用 |
-|---|---|---|
-| `FNOS_DATA_DIR` | `/vol1/1000/docker` | 各应用数据目录的父目录 |
-| `MEDIA_DIR` | `/vol1/1000/video` | Emby 的媒体库目录 |
-| `DOWNLOAD_DIR` | `/vol1/1000/Download` | Music-DL 的下载落盘目录 |
-
-Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
-
-| 宿主机 | 容器内 | 用途 |
-|---|---|---|
-| `$DOWNLOAD_DIR` | `/home/appuser/data/downloads` | 下载的音乐文件 |
-| `$FNOS_DATA_DIR/music-dl` | `/home/appuser/data` | 配置、缓存、日志 |
-
-镜像里**没有** `/app/data` 这个路径，挂到那里数据不会被读到。
-
-Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
-
-- **推荐**：首次打开 AriaNg 后到 `AriaNg 设置 → RPC 密钥` 填一次，配置会存在浏览器 localStorage；
-- 或在 `apps/ariang/app/docker/html/index.html` 里、注入脚本之前加一行
-  `window.ARIA2_SECRET='你的密钥';`，随包固化（注意这是明文提交，仅适合自建自用）。
-
-## Aria2 Pro 的两个特殊处理
-
-1. **反代 RPC**：`app/docker/nginx.conf` 把同源的 `/aria2/jsonrpc` 反代到 `127.0.0.1:6800`。
+1. **反代 RPC**：`app/docker/default.conf.template` 把同源的 `/aria2/jsonrpc` 反代到
+   安装向导里填的 aria2 地址（默认 `127.0.0.1:6800`）。
    这样内网 IP、外网域名、IPv4/IPv6 都共用同一个相对地址，不需要在 AriaNg 里写死主机。
-2. **语言与 RPC 自愈**：AriaNg 的偏好存在 localStorage 里，而 localStorage 按 origin 隔离——
+
+   模板里的 `${ARIA2_RPC}` 由容器启动时 nginx 镜像自带的 envsubst 渲染成实际值。
+   注意必须同时设 `NGINX_ENVSUBST_FILTER=ARIA2_RPC` 白名单：不加的话，模板里的
+   `$remote_addr` / `$uri` / `$scheme` 这些 nginx 内置变量会被一并替换成空值，配置直接失效。
+2. **RPC 密钥不随包分发**。首次打开 AriaNg 后到 `AriaNg 设置 → RPC 密钥` 填一次，
+   配置存在浏览器 localStorage（按 origin 隔离，换域名要重填）。
+   也可以在自己的副本里改 `apps/ariang/app/docker/html/index.html`、在注入脚本之前加一行
+   `window.ARIA2_SECRET='你的密钥';` 随包固化——但那是明文提交，不适合放进公开仓库。
+3. **语言与 RPC 自愈**：AriaNg 的偏好存在 localStorage 里，而 localStorage 按 origin 隔离——
    换一个域名访问就是一份全新的空配置，会回落到英文且 RPC 地址为空（表现为「未连接」）。
    因此对 `aria-ng-*.min.js` 打了三处函数级补丁（标记 `ARIANG_LOCK_ZH`）：
    - 语言固定为中文，不再跟随浏览器语言；
@@ -138,17 +193,22 @@ Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
 2. **host 网络 + `PORT` 环境变量**。容器内 `PORT=8081` 直接占用宿主机 8081，不做端口映射。
    要换端口得同时改三处：compose 里的 `PORT`、`manifest` 的 `service_port`、`app/ui/config` 的 `port`，
    漏改一处就会出现「应用中心显示已启动但点开是空白」。
-3. **下载目录默认落在数据目录下**（`$FNOS_DATA_DIR/metube/downloads`），不是媒体库。
-   想让成品直接进媒体库，把这条挂载改到 `$MEDIA_DIR` 之类的位置即可；
+3. **下载目录默认落在数据目录下**（`wizard_download_dir`，默认
+   `/vol1/1000/docker/metube/downloads`），不是媒体库。
+   想让成品直接进媒体库，安装时把它填成媒体库路径即可；
    `TEMP_DIR` 与 `DOWNLOAD_DIR` 保持同一磁盘可避免合并时跨设备拷贝。
 
 ## RustDesk Server：安装向导如何影响 compose
 
-这是本仓库里唯一一个**在安装向导里选参数、装完 compose 自动按选择生效**的应用。
-向导四个字段（`wizard_data_dir` / `wizard_relay_host` / `wizard_key` / `wizard_force_relay`）
-写在 `wizard/install` 里，compose 里对应写 `${wizard_data_dir}` 这类占位符——
-**fnOS 会在创建容器前把向导值替换进去**，这是让向导影响 compose 的唯一有效途径。
-在 `install_callback` 里改写 compose 文件是没用的，容器在回调之前就已经按原 compose 建好了。
+RustDesk 是这套向导机制最典型的例子（四个字段全部参与），细节见上面「安装向导」一节。
+它的特殊之处在于中继地址和密钥也进了 compose：
+
+```yaml
+command: hbbs -r ${wizard_relay_host}:21117
+environment:
+  - KEY=${wizard_key}
+  - ALWAYS_USE_RELAY=${wizard_force_relay}
+```
 
 配套的四个坑：
 
@@ -181,10 +241,10 @@ Aria2 Pro 的 RPC 密钥不再硬编码，二选一：
 本仓库由实际部署环境整理而来，发布前已做以下处理：
 
 - 移除硬编码的 aria2 RPC 密钥（原为固定字符串），改为空值 + `ARIA2_SECRET` 可选项；
-- 主机绝对路径（`/vol1/1000/...`）改为 `${FNOS_DATA_DIR:-...}` / `${MEDIA_DIR:-...}` 形式，
+- 主机绝对路径不再写死在 compose 里，改为安装向导字段（`${wizard_data_dir}` 等），
   默认值与 fnOS 默认布局一致，因此行为不变但不再绑定具体机器；
-  例外是 RustDesk 安装向导的 `initValue`——向导字段只接受字面量，无法引用环境变量，
-  所以那里保留 fnOS 标准路径作为默认值，安装时可随时改成自己的路径；
+- 向导字段的 `initValue` 保留 fnOS 标准路径作为默认值——向导只接受字面量、
+  无法引用环境变量，这是脱敏规则里唯一的例外，安装时可随时改成自己的路径；
 - 剔除构建产物（`*.fpk`、`app.tgz`）与个人目录结构信息。
 
 ## 免责声明

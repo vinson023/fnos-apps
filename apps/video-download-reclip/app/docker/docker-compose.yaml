@@ -16,8 +16,8 @@ services:
       # 时区，影响日志与下载任务时间
       - TZ=Asia/Shanghai
     volumes:
-      # 下载数据与配置文件目录
-      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/reclip/reclip_data:/app/data:rw
+      # 下载数据与配置文件目录，安装向导里选的 wizard_data_dir
+      - ${wizard_data_dir}/reclip_data:/app/data:rw
       # 跟随宿主机时区
       - /etc/localtime:/etc/localtime:ro
     # 内存上限 1GB，避免长时间下载把宿主机内存吃满

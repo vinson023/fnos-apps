@@ -13,7 +13,7 @@ services:
       # 时区，影响日志与歌曲元数据里的时间
       - TZ=Asia/Shanghai
     volumes:
-      # 下载落盘目录（宿主机音乐库）
-      - ${DOWNLOAD_DIR:-/vol1/1000/Download}:/home/appuser/data/downloads
+      # 下载落盘目录（宿主机音乐库），安装向导里选的 wizard_download_dir
+      - ${wizard_download_dir}:/home/appuser/data/downloads
       # 配置/缓存/日志目录
-      - ${FNOS_DATA_DIR:-/vol1/1000/docker}/music-dl:/home/appuser/data
+      - ${wizard_data_dir}:/home/appuser/data

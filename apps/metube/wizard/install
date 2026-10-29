@@ -1,0 +1,50 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "MeTube 是 yt-dlp 的可视化外壳，提交链接后自动下载并管理队列。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>8081/TCP</b>，请确认未被占用。装好后从桌面图标打开即可使用。<br><br>下面两步决定文件落在哪里：<b>配置目录</b>存队列状态与设置，<b>下载目录</b>存成品视频。两者可以分开（比如配置放 SSD、成品放大容量机械盘）。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "存储位置",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "配置目录",
+                "initValue": "/vol1/1000/docker/metube",
+                "description": "队列状态与全部设置都存放在这里（其下的 config 子目录）。删除会丢失下载历史与设置。填绝对路径，目录不存在会自动创建。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写配置目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_download_dir",
+                "label": "下载目录",
+                "initValue": "/vol1/1000/docker/metube/downloads",
+                "description": "成品视频的落盘目录。想直接进媒体库就填媒体库路径（如 /vol1/1000/video）。下载中的临时文件也放在这里，与成品同盘可避免合并时跨设备拷贝。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写下载目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            }
+        ]
+    }
+]
