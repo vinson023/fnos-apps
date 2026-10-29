@@ -38,7 +38,7 @@ AriaNg —— aria2 的 Web 前端（纯静态，不带后端、不带 aria2）
 
 1.0.1 的首次打开会做一次配置迁移
     旧版 Aria2 Pro（appname ariang）和本应用用同一个端口、同一个域名，
-    浏览器把两者的配置存在同一份 localStorage 里。旧版写坏的三个值会在这里被纠正一次：
+    浏览器把两者的配置存在同一份 localStorage 里。旧版写坏的值会在这里被纠正一次：
 
         语言       zh_CN / en / en-US 等  ->  zh_Hans（简体中文）
         接口       aria2/jsonrpc          ->  jsonrpc
