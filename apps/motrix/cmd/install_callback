@@ -36,4 +36,14 @@ else
     log "部署信息已写入 ${TRIM_PKGETC}/info.txt"
 fi
 
+# 中文界面补丁是否就位。这个文件在 compose 里被挂到
+# /app/dist/renderer-web/assets/app-settings-*.js 上，是「解锁页默认中文」的唯一来源。
+# 文件缺失时 Docker 会把挂载点建成目录，前端会白屏——所以这里明确记一笔。
+PATCH_FILE="${TRIM_APPDEST}/docker/patch/app-settings-D3X0vjxd.js"
+if [ -f "$PATCH_FILE" ]; then
+    log "中文界面补丁就位：${PATCH_FILE}"
+else
+    log "警告：未找到中文界面补丁 ${PATCH_FILE}，界面可能无法加载或退回英文"
+fi
+
 exit 0

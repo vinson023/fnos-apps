@@ -235,7 +235,7 @@ environment:
 `$PKGETC/info.txt`（持久，供排查）与 `$APPDEST/docker/info/meta.txt`（供页面 fetch，
 因为配置目录的 ACL 让 nginx worker 读不到）。
 
-## Motrix 的五个注意点
+## Motrix 的六个注意点
 
 1. **登录密码必须在向导里设，否则得 SSH 上去翻文件**。Motrix 服务器版首次打开会要求输入
    operator token；不设 `MOTRIX_OPERATOR_TOKEN` 时程序自己生成一个随机值写到
@@ -259,6 +259,15 @@ environment:
 5. **官方镜像不含 FFmpeg**。依赖它的插件（转码、音轨提取之类）用不了；
    要支持就得基于官方镜像派生一层装 `ffmpeg` 并设 `MOTRIX_FFMPEG_PATH`，
    那需要自己维护镜像，不在本仓库范围内。
+6. **界面默认中文是打补丁实现的，升级镜像后可能失效**。上游把前端初始语言
+   写死成 `en-US`（`app-settings-<hash>.js` 里的 `b=\`en-US\``），而设置里的
+   `app.language` 要登录后才能读到，所以**解锁页永远是英文**；选「跟随系统」
+   （`system`）时也会落到这个常量。包里带了一份只改这一个常量的 chunk，
+   通过 `volumes` 挂到 `/app/dist/renderer-web/assets/app-settings-D3X0vjxd.js`
+   上，`MOTRIX_HOST_LANGUAGE=zh-CN` 负责服务端侧的语言。
+   **镜像更新后 chunk 的 hash 会变**，挂载点就变成没人引用的旧文件——
+   表现为界面退回英文，功能不受影响（失败安全）。重新打补丁的方法见
+   `apps/motrix/app/docker/patch/README.md`。
 
 与 Aria2 Pro 的关系：两者都是 aria2 前端，但**不冲突**。Motrix 用容器内的 aria2
 （`16800`，只监听 loopback），和独立部署的 `aria2-pro`（`6800`）是两个互不相干的引擎。
@@ -269,6 +278,13 @@ device-code 远程配对。
 
 `apps/ariang/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) 的发行版
 （MIT License，原始许可证保留在 `html/LICENSE`），仅为离线自包含而内联进包。
+
+`apps/motrix/app/docker/patch/app-settings-<hash>.js` 是 Motrix 官方镜像里
+`/app/dist/renderer-web/assets/` 下的同名前端 chunk，**仅替换了一个常量**
+（默认语言 `en-US` → `zh-CN`，两者等长，文件字节数不变，其余逐字节一致），
+用于让登录前的解锁页也显示中文。Motrix 以 MIT 协议发布，该文件不单独再分发，
+仅作为官方镜像的运行时覆盖层使用；镜像更新后此文件即失效，需按同目录 README 重做。
+
 其余各应用仅为容器镜像的封装配置，不含镜像内代码。
 
 ## 脱敏说明

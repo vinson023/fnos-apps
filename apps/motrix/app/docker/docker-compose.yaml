@@ -47,11 +47,18 @@ services:
       # 配对时回给客户端的 Web 审批地址。留空只会让日志多一条 warning，
       # 不影响 Web 界面和下载功能
       - MOTRIX_PUBLIC_URL=${wizard_public_url}
+      # 服务端「主机语言」。aria2 / 插件的提示、以及设置里 language=system 时的
+      # 兜底语言都取自这里，不设会退回 LANG（镜像里是空的）→ 英文
+      - MOTRIX_HOST_LANGUAGE=zh-CN
     volumes:
       # 状态目录（宿主机），安装向导里选的 wizard_data_dir
       - ${wizard_data_dir}/data:/data
       # 下载成品目录，同时是上面 ALLOWED_SAVE_DIRS 指向的位置
       - ${wizard_download_dir}:/downloads
+      # 界面默认中文。上游把「登录前的初始语言」硬编码成了 en-US，
+      # 所以解锁页永远是英文；这个文件只改了一个常量（b=en-US → zh-CN），
+      # 其余字节与原文件完全一致。详见 patch/README.md
+      - ${TRIM_APPDEST}/docker/patch/app-settings-D3X0vjxd.js:/app/dist/renderer-web/assets/app-settings-D3X0vjxd.js:ro
       # 跟随宿主机时区，避免任务时间显示成 UTC
       - /etc/localtime:/etc/localtime:ro
     restart: unless-stopped
