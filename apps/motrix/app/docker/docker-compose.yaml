@@ -5,7 +5,7 @@ services:
     image: motrixapp/motrix-server:latest
     container_name: motrix
     # host 模式：BT / DHT 需要监听 6881（TCP + UDP），桥接模式下这个端口不对外暴露，
-    # 磁力链接基本连不到 peer。Web 8080 与远程配对 16801 也随之直接占用宿主机端口
+    # 磁力链接基本连不到 peer。Web 8088 与远程配对 16801 也随之直接占用宿主机端口
     network_mode: host
     # 优雅退出。容器收到 SIGTERM 后要给 aria2 时间把任务写进 session，
     # 时间不够会导致重启后下载队列丢失
@@ -28,6 +28,8 @@ services:
     environment:
       # 状态目录：SQLite 库、设置、aria2 session、DHT 状态、种子元数据、插件都在这里。
       # 重建容器时少了这个挂载，这些数据全部丢失
+      # Web 监听端口。默认 8080 被多数家宽运营商封禁，改用 8088
+      - PORT=8088
       - MOTRIX_DATA_DIR=/data
       # 下载中的临时文件，与状态同盘，避免合并时跨设备拷贝
       - MOTRIX_TEMP_DIR=/data/tmp
@@ -62,3 +64,17 @@ services:
       # 跟随宿主机时区，避免任务时间显示成 UTC
       - /etc/localtime:/etc/localtime:ro
     restart: unless-stopped
+
+  # Motrix 的 Web 服务把绑定地址写死成 0.0.0.0，只监听 IPv4；
+  # 而本机外网只有公网 IPv6（没有公网 IPv4），所以补一层只监听 IPv6 的转发。
+  # socat 用 ipv6only=1 只占 [::]:8088，与 motrix 的 0.0.0.0:8088 不冲突，
+  # 于是内网走 IPv4、外网走 IPv6，两边都是同一个 8088 端口。
+  # 为什么不用 8080：多数家宽运营商会封 8080，实测 8088 未被封。
+  motrix-v6:
+    image: alpine/socat:latest
+    container_name: motrix-v6
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "TCP6-LISTEN:8088,fork,reuseaddr,ipv6only=1"
+      - "TCP4:127.0.0.1:8088"

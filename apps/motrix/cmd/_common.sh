@@ -3,7 +3,7 @@
 # fnOS 执行钩子时的 PATH 可能不含 /usr/sbin（ss 在 /usr/sbin 下），这里补齐
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
 
-WEB_PORT=8080
+WEB_PORT=8088
 MDXP_PORT=16801
 BT_PORT=6881
 CONTAINER_NAME="motrix"

@@ -25,7 +25,7 @@
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
 | MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 配置目录、下载目录 |
 | RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
-| Motrix | `motrix` | 8080、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
+| Motrix | `motrix` | 8088、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
 | MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 数据目录、媒体库、下载目录、管理员账号 |
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | 无（只需 SSH 登录目标，有默认值） |
 
@@ -362,7 +362,7 @@ environment:
 `$PKGETC/info.txt`（持久，供排查）与 `$APPDEST/docker/info/meta.txt`（供页面 fetch，
 因为配置目录的 ACL 让 nginx worker 读不到）。
 
-## Motrix 的六个注意点
+## Motrix 的七个注意点
 
 1. **登录密码必须在向导里设，否则得 SSH 上去翻文件**。Motrix 服务器版首次打开会要求输入
    operator token；不设 `MOTRIX_OPERATOR_TOKEN` 时程序自己生成一个随机值写到
@@ -395,6 +395,19 @@ environment:
    **镜像更新后 chunk 的 hash 会变**，挂载点就变成没人引用的旧文件——
    表现为界面退回英文，功能不受影响（失败安全）。重新打补丁的方法见
    `apps/motrix/app/docker/patch/README.md`。
+
+7. **Web 端口是 8088，不是默认的 8080，而且多了一个只监听 IPv6 的边车容器**。
+   两件事各有原因：
+   - **为什么换 8088**：多数家宽运营商把 8080 封了（实测同一条线 8080 从外网连不通，
+     而 8088/18080/9080 都通）。所以镜像的 `PORT` 被显式设成 8088，
+     `manifest` 的 `service_port`、`ui/config` 的 `port`、`cmd/_common.sh` 的 `WEB_PORT`
+     三处必须一起改，否则端口检查会误判。
+   - **为什么要 `motrix-v6` 边车**：上游把 Web 服务的绑定地址写死成 `0.0.0.0`，
+     只监听 IPv4。只有公网 IPv6、没有公网 IPv4 的网络就完全访问不到。
+     `motrix-v6` 是一个 `alpine/socat` 容器，用
+     `TCP6-LISTEN:8088,fork,reuseaddr,ipv6only=1` 只占 `[::]:8088` 并转发到
+     `127.0.0.1:8088`。`ipv6only=1` 是关键——不带它 socat 会和 motrix 抢同一个端口，
+     报 `bind: Address in use`。这样内网 IPv4、外网 IPv6 共用 8088 一个端口号。
 
 与 AriaNg 的关系：两者都是 aria2 前端，但**不冲突**。Motrix 用容器内的 aria2
 （`16800`，只监听 loopback），和独立部署的 `aria2-pro`（`6800`）是两个互不相干的引擎。

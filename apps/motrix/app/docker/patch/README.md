@@ -62,6 +62,6 @@ sed 's/b=`en-US`/b=`zh-CN`/' app-settings.js > app-settings-XXXX.js
 
 ```bash
 # 未登录时抓 DOM，html 的 lang 属性与解锁页文案应为中文
-chrome --headless=new --virtual-time-budget=15000 --dump-dom http://<nas>:8080/ \
+chrome --headless=new --virtual-time-budget=15000 --dump-dom http://<nas>:8088/ \
   | grep -o '解锁[^<]*'
 ```

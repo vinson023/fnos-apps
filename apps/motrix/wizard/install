@@ -4,7 +4,7 @@
         "items": [
             {
                 "type": "tips",
-                "helpText": "Motrix 是 aria2 的可视化下载管理器，支持 <b>HTTP / FTP / BT / 磁力</b>，自带插件体系，还能被远程命令行和 AI agent 控制。<br><br>本应用使用官方服务器版镜像（去掉 Electron 外壳，纯 Web 访问），并采用 <b>host 网络模式</b>，会直接占用宿主机以下端口，请确认全部空闲：<br><b>8080/TCP</b>（Web 界面）<br><b>16801/TCP</b>（远程 CLI / 浏览器扩展配对）<br><b>6881/TCP + 6881/UDP</b>（BT 监听与 DHT，<b>两个协议都要放行</b>）<br><br>要让 BT 下得动，还需要在路由器上把 6881 的 TCP/UDP 映射到这台机器。<br><br>下一步会设置登录密码，装完打开 Web 界面时用它解锁。"
+                "helpText": "Motrix 是 aria2 的可视化下载管理器，支持 <b>HTTP / FTP / BT / 磁力</b>，自带插件体系，还能被远程命令行和 AI agent 控制。<br><br>本应用使用官方服务器版镜像（去掉 Electron 外壳，纯 Web 访问），并采用 <b>host 网络模式</b>，会直接占用宿主机以下端口，请确认全部空闲：<br><b>8088/TCP</b>（Web 界面）<br><b>16801/TCP</b>（远程 CLI / 浏览器扩展配对）<br><b>6881/TCP + 6881/UDP</b>（BT 监听与 DHT，<b>两个协议都要放行</b>）<br><br>要让 BT 下得动，还需要在路由器上把 6881 的 TCP/UDP 映射到这台机器。<br><br>下一步会设置登录密码，装完打开 Web 界面时用它解锁。"
             }
         ]
     },
@@ -75,7 +75,7 @@
                 "type": "text",
                 "field": "wizard_public_url",
                 "label": "对外访问地址（可留空）",
-                "description": "只在用远程命令行（@motrix/cli）或浏览器扩展配对时才需要：客户端会拿到这个地址去申请授权。格式如 http://192.168.1.10:8080，必须是别的设备能访问到的地址，不能填 localhost。留空不影响 Web 使用，只是配对时客户端拿不到可用的审批链接。",
+                "description": "只在用远程命令行（@motrix/cli）或浏览器扩展配对时才需要：客户端会拿到这个地址去申请授权。格式如 http://192.168.1.10:8088，必须是别的设备能访问到的地址，不能填 localhost。留空不影响 Web 使用，只是配对时客户端拿不到可用的审批链接。",
                 "rules": [
                     {
                         "pattern": "^$|^https?://[A-Za-z0-9._:-]+(/[A-Za-z0-9._/-]*)?$",

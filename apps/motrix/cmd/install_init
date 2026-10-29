@@ -1,6 +1,6 @@
 #!/bin/bash
 # 安装前检查：Motrix 用 host 网络，端口必须全部空闲。
-# 8080 Web / 16801 远程配对 / 6881 BT（TCP 与 UDP 都要）
+# 8088 Web / 16801 远程配对 / 6881 BT（TCP 与 UDP 都要）
 DIR="$(cd "$(dirname "$0")" && pwd)"
 . "${DIR}/_common.sh"
 
@@ -13,7 +13,7 @@ for p in "${WEB_PORT}" "${MDXP_PORT}" "${BT_PORT}"; do
 done
 
 if [ -n "$conflict" ]; then
-    msg="端口被占用：${conflict}。Motrix 使用 host 网络，需要 8080(Web) / 16801(远程配对) / 6881(BT) 全部空闲，请先停掉占用这些端口的服务。"
+    msg="端口被占用：${conflict}。Motrix 使用 host 网络，需要 8088(Web) / 16801(远程配对) / 6881(BT) 全部空闲，请先停掉占用这些端口的服务。"
     log "$msg"
     # 失败原因写到临时日志文件，安装向导会把内容展示给用户
     if [ -n "${TRIM_TEMP_LOGFILE}" ]; then
