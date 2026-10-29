@@ -2,6 +2,6 @@
     "defaults": {
         "run-as": "package"
     },
-    "username": "ariang",
-    "groupname": "ariang"
+    "username": "aria2ng",
+    "groupname": "aria2ng"
 }

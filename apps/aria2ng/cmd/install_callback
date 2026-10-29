@@ -1,0 +1,33 @@
+#!/bin/bash
+# 纯静态站点，没有需要初始化的东西。
+# 这里只写一份说明，方便事后查看「打开页面后要填什么」。
+
+INFO_DIR="${TRIM_PKGETC:-/vol1/@appconf/aria2ng}"
+mkdir -p "$INFO_DIR" 2>/dev/null
+
+cat > "${INFO_DIR}/info.txt" <<'EOT' || true
+AriaNg —— aria2 的 Web 前端（纯静态，不带后端、不带 aria2）
+
+打开地址
+    http://<本机IP>:6880/
+
+首次打开会显示「未连接」，这是正常的：本应用不预设任何 RPC 地址。
+到左侧「AriaNg 设置」里填这几项，保存后立即生效：
+
+    别名       随便起，例如 本机 aria2
+    RPC 地址   本机的 IP 或主机名（不要带 http:// 和端口）
+    端口       6800
+    接口       jsonrpc
+    协议       http
+    RPC 密钥   aria2 配置里的 rpc-secret（没改过就是 123456）
+
+填完点「保存」，状态会变成「已连接」。
+
+说明
+    - 设置保存在浏览器的 localStorage 里，换设备或换域名访问需要重新填一次。
+    - 浏览器直连 aria2 的 RPC 端口，依赖 aria2 自带的 CORS 头
+      （Access-Control-Allow-Origin: *），标准 aria2 与 aria2-pro 镜像都默认开启。
+    - 想再加一台 aria2，点设置页顶部的「+」新建一个 RPC 配置，用左上角的下拉切换。
+EOT
+
+exit 0

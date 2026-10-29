@@ -10,7 +10,7 @@
 
 | 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 | 安装向导可配置 |
 |---|---|---|---|---|---|
-| Aria2 Pro | `ariang` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | aria2 RPC 地址与密钥 |
+| AriaNg | `aria2ng` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | 无（全部在界面里填） |
 | Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 | 配置目录、媒体库目录 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 下载目录、数据目录 |
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
@@ -33,7 +33,7 @@ apps/<appname>/
 │   │   └── images/         # 图标
 │   └── docker/
 │       ├── docker-compose.yaml
-│       └── ...             # 应用自有静态资源（如 ariang 的 html/ 与 default.conf.template）
+│       └── ...             # 应用自有静态资源（如 aria2ng 的 html/ 与 default.conf）
 ├── cmd/                    # 生命周期钩子，main 需处理 start/stop/status
 ├── config/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
@@ -47,8 +47,8 @@ apps/<appname>/
 需要 fnOS 官方的 `fnpack`：
 
 ```bash
-fnpack build -d apps/ariang
-# 产物落在当前工作目录：ariang.fpk
+fnpack build -d apps/aria2ng
+# 产物落在当前工作目录：aria2ng.fpk
 ```
 
 或一次构建全部：
@@ -62,19 +62,19 @@ fnpack build -d apps/ariang
 `appcenter-cli` 使用**位置参数**，没有 `-a` 这种短选项：
 
 ```bash
-appcenter-cli install-fpk ariang.fpk
-appcenter-cli start ariang
-appcenter-cli status ariang
+appcenter-cli install-fpk aria2ng.fpk
+appcenter-cli start aria2ng
+appcenter-cli status aria2ng
 ```
 
 **升级必须先卸载**：`install-fpk` 对同名已装应用不会重新解压 `/vol1/@appcenter/<app>/`，
 直接覆盖会导致容器仍从旧 compose 启动。
 
 ```bash
-docker rm -f ariang
-appcenter-cli uninstall ariang
-appcenter-cli install-fpk ariang.fpk
-appcenter-cli start ariang
+docker rm -f aria2ng
+appcenter-cli uninstall aria2ng
+appcenter-cli install-fpk aria2ng.fpk
+appcenter-cli start aria2ng
 ```
 
 **带向导的应用用命令行安装时必须传 `-e`**，且要包含全部向导字段，
@@ -122,12 +122,12 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 
 ## 各应用的挂载点
 
-路径都在安装向导里选，默认值与 fnOS 标准布局一致：
+路径都在安装向导里选，默认值与 fnOS 标准布局一致。
+
+`aria2ng` 是纯静态站点，**没有安装向导、也没有任何数据目录挂载**，所以不在下表内。
 
 | 应用 | 向导字段 | 默认值 | 容器内 |
 |---|---|---|---|
-| `ariang` | `wizard_aria2_rpc` | `127.0.0.1:6800` | 反代目标，非挂载 |
-| `ariang` | `wizard_aria2_secret` | 无（必须自己设） | 经 `/aria2/config.js` 下发给前端，非挂载 |
 | `emby` | `wizard_data_dir` | `/vol1/1000/docker/emby` | `/config`（其下 `config` 子目录） |
 | `emby` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
 | `music-dl` | `wizard_download_dir` | `/vol1/1000/Download` | `/home/appuser/data/downloads` |
@@ -158,7 +158,7 @@ Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改�
 
 由 `app/ui/config` 里 `.url.<id>.type` 决定：
 
-- `"iframe"` → 在 fnOS 桌面内开窗口，可用 `width` / `height` 指定尺寸（Aria2 Pro 用 1280×860）；
+- `"iframe"` → 在 fnOS 桌面内开窗口，可用 `width` / `height` 指定尺寸（AriaNg 用 1280×860）；
 - `"url"` → 新开浏览器页签。
 
 **已安装的应用改 `ui/config` 不会立即生效**。`open_type` 有三层数据源，且以数据库为根源：
@@ -173,57 +173,37 @@ trim_sac.entry.open_type        ← 展示层
 **重新安装 fpk 时包里的 `ui/config` 会写回数据库**——所以源码里的值必须和期望一致，
 否则每次重装都会被打回。本项目曾因 Emby 源码里遗留 `iframe` 而反复变回窗口模式。
 
-## Aria2 Pro 的三个特殊处理
+## AriaNg 的两个注意点
 
-1. **反代 RPC**：`app/docker/default.conf.template` 把同源的 `/aria2/jsonrpc` 反代到
-   安装向导里填的 aria2 地址（默认 `127.0.0.1:6800`）。
-   这样内网 IP、外网域名、IPv4/IPv6 都共用同一个相对地址，不需要在 AriaNg 里写死主机。
+1. **纯静态，没有任何反向代理**。`app/docker/default.conf` 只做静态托管，容器里没有
+   `proxy_pass`。AriaNg 以浏览器的身份直接去连 aria2 的 RPC 端口，依赖 aria2 自带的
+   CORS 头（`Access-Control-Allow-Origin: *`，标准 aria2 与 aria2-pro 镜像都默认开启，
+   实测连 `OPTIONS` 预检都正常应答）。
 
-   模板里的 `${ARIA2_RPC}` 由容器启动时 nginx 镜像自带的 envsubst 渲染成实际值。
-   注意必须同时设 `NGINX_ENVSUBST_FILTER=ARIA2_RPC|ARIA2_SECRET` 白名单：不加的话，模板里的
-   `$remote_addr` / `$uri` / `$scheme` 这些 nginx 内置变量会被一并替换成空值，配置直接失效。
-2. **RPC 密钥由向导注入、服务端下发，静态文件里没有明文**。
-   向导里的 `wizard_aria2_secret` 变成容器环境变量 `ARIA2_SECRET`，再由 nginx 的
-   `/aria2/config.js` 端点以 `window.ARIA2_SECRET="..."` 的形式下发给页面：
+   好处是这个应用**完全不需要知道 aria2 在哪**，没有预设地址、没有密钥下发、没有向导字段；
+   代价是**换设备或换浏览器访问时要重新填一次 RPC**（配置在 localStorage，按 origin 隔离）。
 
-   ```nginx
-   location = /aria2/config.js {
-       default_type application/javascript;
-       add_header Cache-Control "no-store";
-       return 200 'window.ARIA2_SECRET="${ARIA2_SECRET}";';
-   }
-   ```
+2. **零补丁，只有一处默认语言**。`html/` 直接用官方 AriaNg v1.2.3 的 release 包，
+   唯一改动是把 `ariaNgDefaultOptions.language` 从 `"en"` 改成 `"zh_Hans"`——一个常量，
+   界面上随时能改回去。没有语言锁定、没有 RPC 锁定、没有注入脚本。
 
-   `index.html` 在 `<head>` 最前面加载这个脚本。于是密钥只存在于容器环境变量里，
-   随包分发的 `index.html` 和 `aria-ng-*.min.js` 都不含明文——公开仓库可以直接放源码。
-3. **默认值只补缺失，绝不覆盖用户改过的值**。
-   AriaNg 的偏好存在 localStorage（按 origin 隔离），换域名访问就是一份空配置。
-   为了「换设备/换域名也能直接用」，对 `aria-ng-*.min.js` 打了函数级补丁（标记 `ARIANG_FILL_MISSING`）：
+   这里踩过两个坑，值得记一笔：
 
-   ```js
-   T = function(e){
-       e.rpcHost      || (e.rpcHost = location.host() || defaultHost);
-       e.rpcPort      || (e.rpcPort = String(location.port() || (https ? 443 : 80)));
-       e.rpcInterface || (e.rpcInterface = "aria2/jsonrpc");
-       e.protocol     || (e.protocol = https ? "https" : "http");
-       !e.secret && window.ARIA2_SECRET && (e.secret = btoa(window.ARIA2_SECRET));
-   }
-   ```
+   - **语言值必须是 `en` / `zh_Hans` / `zh_Hant` 三者之一**。语言 loader 第一句就是
+     `if(!c[t.key]) return n.reject(t.key)`，传 `zh_CN` 会被直接 reject，整站回落到
+     内置英文表。`zh_CN` 只是 `zh_Hans` 的别名，只有在 `b()` 做别名解析时才有效，
+     不能当 loader 的 key。
+   - **`try_files ... /index.html` 的兜底会把 index.html 当成语言文件返回**。
+     缺失的 `langs/xxx.txt` 会返回 200 + HTML，AriaNg 解析出一堆垃圾键，同样表现为英文。
+     所以 `default.conf` 给 `/langs/` 单独加了 `try_files $uri =404`。
 
-   **关键点是每个字段都带 `||` 前置判断**：只有空值才填，用户在界面里改过的值原样保留。
-   早期版本这里是无条件赋值（`e.rpcHost = ...` 一直写到底），结果每次加载配置都把用户的
-   修改打回去，表现为「RPC 改不了、新建的 RPC 也存不住」。同时 `w()` 里那句
-   `t.language="zh_CN"` 也去掉了，语言只在没有存储值时取默认的 `zh_CN`。
-
-   补丁在压缩产物上直接改，改完可用 `node --check` 验证语法。
-
-   **验证方法**（用 CDP 驱动无头 Chrome，比肉眼看可靠）：
+   **验证方法**（CDP 驱动无头 Chrome，比肉眼看可靠）：
 
    | 场景 | 期望 |
    |---|---|
-   | localStorage 清空 | 自动补上密钥，状态「已连接」 |
-   | 手填一个错密钥后刷新 | 密钥原样保留，报「认证失败」（说明没被覆盖） |
-   | 旧版遗留 `secret: ""` | 自动补回密钥，状态「已连接」 |
+   | localStorage 清空 | 中文界面，状态「未连接」（没配 RPC，属正常） |
+   | 手填 RPC 地址/端口/密钥 | 状态「已连接」，能列出任务 |
+   | 改一次 RPC 后刷新 | 改动保留，仍「已连接」 |
 
 ## MeTube 的三个注意点
 
@@ -305,7 +285,7 @@ environment:
    表现为界面退回英文，功能不受影响（失败安全）。重新打补丁的方法见
    `apps/motrix/app/docker/patch/README.md`。
 
-与 Aria2 Pro 的关系：两者都是 aria2 前端，但**不冲突**。Motrix 用容器内的 aria2
+与 AriaNg 的关系：两者都是 aria2 前端，但**不冲突**。Motrix 用容器内的 aria2
 （`16800`，只监听 loopback），和独立部署的 `aria2-pro`（`6800`）是两个互不相干的引擎。
 Motrix 额外提供原生 BT/磁力、插件体系、tracker 订阅，以及 `@motrix/cli` / AI agent 的
 device-code 远程配对。
@@ -343,10 +323,10 @@ device-code 远程配对。
 
 ## 关于第三方代码
 
-`apps/ariang/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) 的发行版
-（MIT License，原始许可证保留在 `html/LICENSE`），仅为离线自包含而内联进包。
-其中 `js/aria-ng-*.min.js` 打了函数级补丁（标记 `ARIANG_FILL_MISSING`，见上文「Aria2 Pro 的三个特殊处理」），
-只改 `ariaNgSettingService` 里的默认值填充函数与默认选项，其余字节与上游一致。
+`apps/aria2ng/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) v1.2.3
+官方 release 包的原样内联（MIT License，原始许可证保留在 `html/LICENSE`），仅为离线自包含。
+唯一的改动是 `js/aria-ng-*.min.js` 里 `ariaNgDefaultOptions.language` 由 `"en"` 改为
+`"zh_Hans"`（默认语言，界面可改），其余字节与上游完全一致。
 
 `apps/motrix/app/docker/patch/app-settings-<hash>.js` 是 Motrix 官方镜像里
 `/app/dist/renderer-web/assets/` 下的同名前端 chunk，**仅替换了一个常量**
@@ -360,8 +340,8 @@ device-code 远程配对。
 
 本仓库由实际部署环境整理而来，发布前已做以下处理：
 
-- aria2 RPC 密钥不再出现在任何静态文件里：`index.html` 与 `aria-ng-*.min.js` 都是空值，
-  密钥由安装向导填写，经容器环境变量 `ARIA2_SECRET` 由 nginx 的 `/aria2/config.js` 运行时下发；
+- `aria2ng` 里**没有任何凭据**：它是官方原版 AriaNg 静态站，RPC 地址、端口、密钥全部由用户
+  在浏览器里自己填，包里没有预设值，也不含反向代理；
 - 主机绝对路径不再写死在 compose 里，改为安装向导字段（`${wizard_data_dir}` 等），
   默认值与 fnOS 默认布局一致，因此行为不变但不再绑定具体机器；
 - 向导字段的 `initValue` 保留 fnOS 标准路径作为默认值——向导只接受字面量、

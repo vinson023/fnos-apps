@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONTAINER_NAME="ariang"
+CONTAINER_NAME="aria2ng"
 
 is_running() {
     docker inspect "$CONTAINER_NAME" 2>/dev/null | grep -q '"Status": "running"'

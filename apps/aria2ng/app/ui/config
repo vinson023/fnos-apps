@@ -1,7 +1,7 @@
 {
     ".url": {
-        "ariang.main": {
-            "title": "Aria2 Pro",
+        "aria2ng.main": {
+            "title": "AriaNg",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
             "protocol": "",
