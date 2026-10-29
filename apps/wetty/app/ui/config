@@ -6,7 +6,7 @@
             "type": "iframe",
             "protocol": "",
             "port": "3002",
-            "url": "/",
+            "url": "/?v=1.0.3",
             "width": 1100,
             "height": 760,
             "allUsers": false
