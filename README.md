@@ -16,8 +16,9 @@
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
 | MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 配置目录、下载目录 |
 | RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
+| Motrix | `motrix` | 8080、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
 
-**六个应用都带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+**七个应用都带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 ## 仓库结构
 
@@ -133,6 +134,10 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 | `metube` | `wizard_data_dir` | `/vol1/1000/docker/metube` | `/config`（其下 `config` 子目录） |
 | `metube` | `wizard_download_dir` | `/vol1/1000/docker/metube/downloads` | `/downloads` |
 | `rustdesk` | 四个字段 | 见下 | 见下 |
+| `motrix` | `wizard_data_dir` | `/vol1/1000/docker/motrix` | `/data`（其下 `data` 子目录） |
+| `motrix` | `wizard_download_dir` | `/vol1/1000/Download` | `/downloads` |
+| `motrix` | `wizard_operator_token` | 无（必须自己设） | Web 登录密码 |
+| `motrix` | `wizard_public_url` | 留空 | 远程配对审批地址，非挂载 |
 
 Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
 
@@ -229,6 +234,36 @@ environment:
 私钥虽在同一挂载目录下但没有任何路由可读。安装时写入的配置存在两处：
 `$PKGETC/info.txt`（持久，供排查）与 `$APPDEST/docker/info/meta.txt`（供页面 fetch，
 因为配置目录的 ACL 让 nginx worker 读不到）。
+
+## Motrix 的五个注意点
+
+1. **登录密码必须在向导里设，否则得 SSH 上去翻文件**。Motrix 服务器版首次打开会要求输入
+   operator token；不设 `MOTRIX_OPERATOR_TOKEN` 时程序自己生成一个随机值写到
+   `/data/operator-token`（0600），而 fpk 的生命周期钩子以应用用户身份运行、读不到它，
+   没法替你显示出来。所以向导里把它设成必填，装完直接用这个密码解锁。
+   安装时还会在 `$PKGETC/info.txt` 留一份，忘记密码可以到 NAS 上查
+   （`/vol1/@appconf/motrix/info.txt`，需 root 或管理员权限）。
+   **改密码 = 重新安装**（数据目录不删就不会丢）——应用用户没有 docker 权限，
+   无法在回调里重建容器，所以没做 `wizard/config` 配置页。
+2. **只能以 root 运行**。官方推荐 `user: 1000:1000`，但那要求 `/data` 与 `/downloads`
+   的属主是 1000；本仓库的安装钩子对 `/vol1/1000/docker` 没有写权限，无法替你 `chown`，
+   而 Docker 创建缺失目录时是 `root:root`。权衡后选 root（与 emby / reclip 一致）。
+   镜像自带的 `read_only`、`no-new-privileges`、tmpfs `/tmp` 仍然保留。
+3. **`MOTRIX_DEFAULT_SAVE_DIR` 要填容器内路径**。这个值不是宿主机路径，
+   用户选的下载目录靠 `volumes` 映射到 `/downloads`。填成宿主机路径会让启动直接失败：
+   `fatal AppError: Save directory cannot be created: /vol1/... (ENOENT: mkdir '/vol1')`
+   —— 容器里没有 `/vol1`。`MOTRIX_ALLOWED_SAVE_DIRS` 同理，且必须包含前者。
+4. **BT 端口 6881 是懒绑定的**。aria2 只在第一个 BT/磁力任务开始时才打开 6881 的
+   TCP/UDP 监听，空闲时 `ss` 看不到它，这是正常现象。路由器的端口映射照做即可
+   （映射是静态的，不依赖进程当前是否在监听）。
+5. **官方镜像不含 FFmpeg**。依赖它的插件（转码、音轨提取之类）用不了；
+   要支持就得基于官方镜像派生一层装 `ffmpeg` 并设 `MOTRIX_FFMPEG_PATH`，
+   那需要自己维护镜像，不在本仓库范围内。
+
+与 Aria2 Pro 的关系：两者都是 aria2 前端，但**不冲突**。Motrix 用容器内的 aria2
+（`16800`，只监听 loopback），和独立部署的 `aria2-pro`（`6800`）是两个互不相干的引擎。
+Motrix 额外提供原生 BT/磁力、插件体系、tracker 订阅，以及 `@motrix/cli` / AI agent 的
+device-code 远程配对。
 
 ## 关于第三方代码
 

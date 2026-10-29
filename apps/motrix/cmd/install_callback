@@ -1,0 +1,39 @@
+#!/bin/bash
+# 安装后回调：只记录配置，不碰容器。
+#
+# 注意：容器由 fnOS 通过 Docker API 按 docker-compose.yaml 创建，
+# 且在 install_callback 之前就已经建好了；这里再去改 compose 或 docker compose up
+# 都不会生效（应用用户也没有 docker 权限，会报 code 10237）。
+# 向导值能影响容器，靠的是 compose 里的 ${wizard_xxx} 占位符。
+#
+# 这里做的事：把部署参数（含登录密码）留一份到 PKGETC/info.txt，
+# 供用户忘记密码时查看——登录密码只在安装时以环境变量形式出现一次，
+# 之后只存在于容器环境里，不落盘就没有别的途径能查到。
+DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${DIR}/_common.sh"
+
+DATA_DIR="$(wiz wizard_data_dir "${FNOS_DATA_DIR:-/vol1/1000/docker}/motrix")"
+DL_DIR="$(wiz wizard_download_dir "${DOWNLOAD_DIR:-/vol1/1000/Download}")"
+TOKEN="$(wiz wizard_operator_token "")"
+PUBLIC_URL="$(wiz wizard_public_url "")"
+
+mkdir -p "${TRIM_PKGETC}" 2>/dev/null
+
+cat > "${TRIM_PKGETC}/info.txt" <<INFO
+# Motrix 部署信息
+# OPERATOR_TOKEN 就是 Web 界面的登录密码，忘记时看这里（需要 root 或管理员权限）
+DATA_DIR=${DATA_DIR}
+DOWNLOAD_DIR=${DL_DIR}
+WEB_URL=http://<NAS地址>:${WEB_PORT}
+OPERATOR_TOKEN=${TOKEN}
+PUBLIC_URL=${PUBLIC_URL}
+INSTALLED_AT=$(date '+%F %T')
+INFO
+
+if [ -z "$TOKEN" ]; then
+    log "警告：未设置登录密码，容器会自动生成 /data/operator-token，需手动查看"
+else
+    log "部署信息已写入 ${TRIM_PKGETC}/info.txt"
+fi
+
+exit 0

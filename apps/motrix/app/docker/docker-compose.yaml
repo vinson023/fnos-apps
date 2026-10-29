@@ -1,0 +1,57 @@
+services:
+  motrix:
+    # Motrix 2.0 官方服务器版镜像：下载内核 + aria2 打包成非 root 多架构镜像，
+    # 去掉了 Electron 外壳，通过浏览器访问。与桌面版共用任务模型和设置项
+    image: motrixapp/motrix-server:latest
+    container_name: motrix
+    # host 模式：BT / DHT 需要监听 6881（TCP + UDP），桥接模式下这个端口不对外暴露，
+    # 磁力链接基本连不到 peer。Web 8080 与远程配对 16801 也随之直接占用宿主机端口
+    network_mode: host
+    # 优雅退出。容器收到 SIGTERM 后要给 aria2 时间把任务写进 session，
+    # 时间不够会导致重启后下载队列丢失
+    stop_grace_period: 2m
+    # 镜像以 PID 1 运行 Node，需要 init 负责回收僵尸进程
+    init: true
+    # 根文件系统只读，运行期只写 /data、/downloads 与 tmpfs 上的 /tmp。
+    # 镜像本身按这个前提设计，不要改成可写
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    # 以 root 运行。官方推荐 1000:1000，但那要求 /data 与 /downloads 的属主是 1000，
+    # 而本应用的安装钩子以「应用用户」身份运行、对 /vol1/1000/docker 没有写权限，
+    # 无法在安装时替你 chown 这两个目录；Docker 创建缺失目录时又是 root:root。
+    # 权衡后选 root（与本仓库的 emby / reclip 一致）
+    user: "0:0"
+    security_opt:
+      # 禁止容器内进程通过 setuid/setgid 提权
+      - no-new-privileges:true
+    environment:
+      # 状态目录：SQLite 库、设置、aria2 session、DHT 状态、种子元数据、插件都在这里。
+      # 重建容器时少了这个挂载，这些数据全部丢失
+      - MOTRIX_DATA_DIR=/data
+      # 下载中的临时文件，与状态同盘，避免合并时跨设备拷贝
+      - MOTRIX_TEMP_DIR=/data/tmp
+      - MOTRIX_PLUGIN_DIR=/data/plugins
+      # 新任务的默认保存目录，以及服务端强制执行的允许写入根目录。
+      # 注意这里填的是**容器内路径**，宿主机上用户选的那个目录由下面的 volumes 映射到 /downloads。
+      # 两者必须一致（或后者包含前者），只做一半会让任务被拒绝
+      - MOTRIX_DEFAULT_SAVE_DIR=/downloads
+      - MOTRIX_ALLOWED_SAVE_DIRS=/downloads
+      # 登录凭据。设置后不再生成 /data/operator-token 文件，
+      # 用户装完直接用向导里填的这个密码解锁 Web 界面
+      - MOTRIX_OPERATOR_TOKEN=${wizard_operator_token}
+      # 远程 CLI / 浏览器扩展的配对入口。这里控制的是容器内的 listener，
+      # host 模式下等于直接监听宿主机 16801
+      - MOTRIX_MDXP_HOST=0.0.0.0
+      - MOTRIX_MDXP_PORT=16801
+      # 配对时回给客户端的 Web 审批地址。留空只会让日志多一条 warning，
+      # 不影响 Web 界面和下载功能
+      - MOTRIX_PUBLIC_URL=${wizard_public_url}
+    volumes:
+      # 状态目录（宿主机），安装向导里选的 wizard_data_dir
+      - ${wizard_data_dir}/data:/data
+      # 下载成品目录，同时是上面 ALLOWED_SAVE_DIRS 指向的位置
+      - ${wizard_download_dir}:/downloads
+      # 跟随宿主机时区，避免任务时间显示成 UTC
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
