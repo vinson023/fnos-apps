@@ -1,0 +1,12 @@
+appname=wetty
+version=1.0.0
+display_name=WeTTY
+desc=WeTTY 把终端搬进浏览器。装完打开页面，输入 NAS 的账号密码，就能在网页里直接操作 shell，手机上也能用。
+source=thirdparty
+platform=all
+maintainer=vinson023
+desktop_uidir=ui
+desktop_applaunchname=wetty.main
+service_port=3002
+ctl_stop=true
+checkport=true

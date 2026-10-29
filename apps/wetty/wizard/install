@@ -1,0 +1,33 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "WeTTY 把终端搬到浏览器里：装完打开就是一个终端，输入 NAS 的密码即可操作 shell，手机上也能用。<br><br>它用 <b>host 网络模式</b>，直接占用宿主机 <b>3002/TCP</b>，请确认未被占用。<br><br><b>它自己不存任何东西</b>：真正的 shell 来自飞牛自己的 sshd（<code>ssh 127.0.0.1:22</code>），所以装之前请确认 NAS 的 SSH 是开着的。<br><br><b>安全提醒</b>：WeTTY 没有自己的登录页，认证完全交给 ssh。谁能访问到 3002，谁就能看到密码提示并尝试登录。<b>不要把这个端口直接映射到公网</b>，外网请走 VPN。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "登录目标",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_ssh_target",
+                "label": "SSH 登录目标",
+                "initValue": "root@127.0.0.1",
+                "description": "格式 user@host。默认登录飞牛本机的 root；不想用 root 就改成自己的账号（如 admin@127.0.0.1）。填 127.0.0.1 表示本机，填别的地址可以当跳板去连别的机器。端口固定 22。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写登录目标"
+                    },
+                    {
+                        "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9.:_-]+$",
+                        "message": "格式必须是 user@host，例如 root@127.0.0.1"
+                    }
+                ]
+            }
+        ]
+    }
+]

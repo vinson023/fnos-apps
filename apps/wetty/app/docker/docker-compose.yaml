@@ -1,0 +1,38 @@
+services:
+  wetty:
+    # WeTTY = Web + TTY，把终端搬到浏览器里（xterm.js + node-pty 的服务端封装）
+    image: butlerx/wetty:latest
+    container_name: wetty
+    # 异常退出或宿主机重启后自动拉起
+    restart: always
+    # host 模式：容器内监听的 3002 直接占用宿主机端口，不做映射。
+    # 更关键的是——只有 host 网络下 127.0.0.1 才指向宿主机，
+    # 下面的 ssh 才能登进飞牛本身而不是容器自己
+    network_mode: host
+    environment:
+      # 时区，影响终端里的 date 与日志时间
+      - TZ=Asia/Shanghai
+      # 登录目标，格式 user@host。默认登本机的 root，安装向导里可改
+      - WETTY_SSH_TARGET=${wizard_ssh_target}
+    volumes:
+      # 入口脚本：把终端会话交给 ssh，密码在浏览器里输。
+      # 只读挂载，容器内不落任何可写状态（WeTTY 本身无状态）
+      - ${TRIM_APPDEST}/docker/wetty-shell.sh:/usr/local/bin/wetty-shell:ro
+      # 跟随宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+    command:
+      # 监听端口，需与 manifest 的 service_port、ui/config 的 port 一致
+      - "--port"
+      - "3002"
+      - "--host"
+      - "0.0.0.0"
+      # 直接挂在根路径，桌面图标打开就是终端，不用再拼 /wetty/
+      - "--base"
+      - "/"
+      - "--title"
+      - "WeTTY 终端"
+      # 注意：WeTTY 的 --command 是在「容器内本地执行」的命令，不走它自带的 ssh 逻辑。
+      # 自带的 ssh 只服务于默认的 login 流程，而那条路会在 ssh 之后再跑一次 login，
+      # 在飞牛上任何账号都会被判 Login incorrect。所以这里用脚本自己 exec ssh。
+      - "--command"
+      - "/usr/local/bin/wetty-shell"

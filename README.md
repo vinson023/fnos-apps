@@ -20,9 +20,11 @@
 | RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
 | Motrix | `motrix` | 8080、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
 | MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 数据目录、媒体库、下载目录、管理员账号 |
+| WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | 无（只需 SSH 登录目标，有默认值） |
 
-**八个应用里七个带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+**九个应用里八个带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 唯一没有向导的是 `aria2ng`——它是纯静态站点，没有任何需要配置的路径。
+`wetty` 的向导只有一个字段（SSH 登录目标），不填也能用。
 
 ## 仓库结构
 
@@ -42,7 +44,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（八个应用都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（九个应用里八个有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -423,6 +425,35 @@ device-code 远程配对。
 另外两点实现细节：入口脚本自带 `tini`，compose 里**不能**再加 `init: true`（会变成双份 init）；
 `PUID`/`PGID` 默认 0，想改成普通用户直接改这两个值即可，入口脚本会自动 chown `/config`。
 
+## WeTTY 的四个注意点
+
+1. **它自己没有 shell，也没有登录页**。真正的 shell 来自飞牛自己的 sshd：
+   浏览器 ↔ WeTTY ↔ `ssh 127.0.0.1:22` ↔ NAS。所以 NAS 的 SSH 必须开着，
+   能做什么完全等于该账号 SSH 登录后能做什么。WeTTY 自身无状态，容器里不落任何东西。
+
+2. **不能用它的 `--sshhost`，得自己 exec ssh**。WeTTY 1.2.1 有两条路：
+   - 默认的 `login` 流程会先 ssh 上去、**再在远端跑一次 `login`**。在飞牛上这条 `login`
+     会把所有账号都判成 `Login incorrect`（root、admin 都试过），整条路走不通；
+   - `--command` 则**完全绕过它自带的 ssh，在容器内本地执行**——写成 `--command bash`
+     会得到 `env: can't execute 'bash'`（容器里根本没有 bash），写成
+     `--command "/bin/bash -l"` 会得到 `env: can't execute '/bin/bash -l'`（不拆分参数）。
+
+   所以包里带了个 `app/docker/wetty-shell.sh`，只读挂到容器内，用
+   `--command /usr/local/bin/wetty-shell` 让它 `exec ssh`，认证交给 ssh 自己、
+   密码在浏览器终端里输。登录目标由 `WETTY_SSH_TARGET` 决定（向导字段，默认 `root@127.0.0.1`）。
+
+3. **`docker/wetty-shell.sh` 在包里必须是 `755`**。它被 `:ro` 挂进容器，644 的话
+   `env` 无法执行它，表现为终端里只有一行 `env: can't execute ...` 加一个 reconnect 按钮。
+   `fnpack` 会保留源文件权限，所以出包前要在 NAS 上 `chmod 755`（见 `scripts/` 里的说明）；
+   `install_callback` / `upgrade_callback` 里也会再 chmod 一次兜底。
+
+4. **必须 host 网络**。只有 host 模式下容器内的 `127.0.0.1` 才指向宿主机，
+   ssh 才登得进飞牛本身；桥接模式下 `127.0.0.1` 是容器自己，必然连不上。
+   代价是 3002 直接占用宿主机端口（与 `manifest` 的 `service_port`、`ui/config` 的 `port` 三处一致）。
+
+   安全上必须清楚：**WeTTY 把认证完全交给 ssh，谁能访问 3002，谁就能看到密码提示并尝试登录**。
+   不要把 3002 直接映射到公网；要外网用请走 VPN，或自己加一层带认证的反向代理。
+
 ## 关于第三方代码
 
 `apps/aria2ng/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) v1.2.3
@@ -443,6 +474,9 @@ device-code 远程配对。
 仅作为官方镜像的运行时覆盖层使用；镜像更新后此文件即失效，需按同目录 README 重做。
 
 其余各应用仅为容器镜像的封装配置，不含镜像内代码。
+
+`apps/wetty/app/docker/wetty-shell.sh` 是仓库自己写的 8 行入口脚本（`exec ssh`），
+不来自上游；WeTTY 本体（`butlerx/wetty`，MIT）以官方镜像原样运行，仓库里不含其源码。
 
 ## 脱敏说明
 

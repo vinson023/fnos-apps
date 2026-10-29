@@ -1,0 +1,50 @@
+#!/bin/bash
+# WeTTY：容器无状态，这里只做两件事：
+#   1) 保证入口脚本可执行——它被只读挂进容器，644 的话容器内会「env: can't execute」；
+#   2) 写一份使用说明到 @appconf，方便随时查。
+
+APPDIR="${TRIM_APPDEST:-/vol1/@appcenter/wetty}"
+CONF="${TRIM_PKGETC:-/vol1/@appconf/wetty}"
+mkdir -p "$CONF" 2>/dev/null
+
+SHELL_SCRIPT="${APPDIR}/docker/wetty-shell.sh"
+if [ -f "$SHELL_SCRIPT" ]; then
+    chmod 755 "$SHELL_SCRIPT" 2>/dev/null
+fi
+
+cat > "${CONF}/info.txt" <<EOT
+WeTTY —— 浏览器里的终端
+
+打开地址
+    http://<本机IP>:3002/
+
+怎么用
+    页面打开就是终端，提示 root@127.0.0.1's password: 时输入 NAS 的密码即可。
+    登录目标（默认 root@127.0.0.1）可以在安装向导里改，也可以改
+        ${APPDIR}/docker/docker-compose.yaml
+    里的 WETTY_SSH_TARGET，然后重启应用。
+
+它是什么、不是什么
+    WeTTY 只是个前端，真正的 shell 来自 NAS 自己的 sshd：
+    浏览器 <-> WeTTY <-> ssh 127.0.0.1:22 <-> 你的 NAS。
+    所以：
+      - NAS 上的 SSH 必须开着（端口 22）；
+      - 登录目标那个账号必须允许密码登录；
+      - 终端里能做什么，完全等于该账号 SSH 登录后能做什么。
+
+安全提醒（重要）
+    WeTTY 自身没有登录页，它把认证交给 ssh。也就是说，
+    **谁能访问到 3002 端口，谁就能看到 ssh 的密码提示并尝试登录**。
+    因此：
+      - 不要在路由器上把 3002 直接映射到公网；
+      - 要外网用，请走 VPN，或者自己加一层带认证的反向代理；
+      - 密码就是 NAS 账号密码，别用弱口令。
+
+常见现象
+    一直停在 password 提示   = 密码不对，或该账号禁止密码登录（看 /etc/ssh/sshd_config）
+    Connection refused       = NAS 的 sshd 没开，或端口不是 22
+    打不开 3002              = 容器没起来，docker logs wetty 看原因
+    中文显示成方块           = 终端字体缺中文字形，属浏览器侧字体问题
+EOT
+
+exit 0

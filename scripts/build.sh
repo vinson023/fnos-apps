@@ -35,6 +35,12 @@ for app in "${APPS[@]}"; do
     # 从 Windows/压缩包同步过来的源码常丢失可执行位，缺了会导致安装后脚本无法执行
     chmod +x "$src"/cmd/* 2>/dev/null || true
 
+    # wetty 的入口脚本会被 :ro 挂进容器并由 env 执行，包里必须是 755，
+    # 否则终端里只剩一行 "env: can't execute ..."。fnpack 保留源文件权限，所以这里先修好
+    if [ -f "$src/app/docker/wetty-shell.sh" ]; then
+        chmod 755 "$src/app/docker/wetty-shell.sh"
+    fi
+
     # fnpack 把产物写到当前工作目录，所以先切到 dist
     ( cd "$DIST" && fnpack build -d "$src" )
 

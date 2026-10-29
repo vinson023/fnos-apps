@@ -1,0 +1,5 @@
+#!/bin/bash
+# 升级后重新确认入口脚本的可执行位（只读挂载进容器，644 会导致会话起不来）。
+APPDIR="${TRIM_APPDEST:-/vol1/@appcenter/wetty}"
+[ -f "${APPDIR}/docker/wetty-shell.sh" ] && chmod 755 "${APPDIR}/docker/wetty-shell.sh" 2>/dev/null
+exit 0

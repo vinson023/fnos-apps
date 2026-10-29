@@ -1,0 +1,3 @@
+#!/bin/bash
+# WeTTY 无持久化状态，卸载时无事可做。
+exit 0

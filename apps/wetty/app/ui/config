@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "wetty.main": {
+            "title": "WeTTY",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "3002",
+            "url": "/",
+            "width": 1100,
+            "height": 760,
+            "allUsers": false
+        }
+    }
+}
