@@ -1,5 +1,5 @@
 appname=video-download-reclip
-version=1.0.2
+version=1.0.3
 display_name=ReClip
 desc=ReClip 免费视频/音频下载工具，支持多平台媒体解析与下载。
 source=thirdparty
@@ -11,5 +11,5 @@ desktop_uidir=ui
 desktop_applaunchname=video-download-reclip.main
 service_port=8899
 ctl_stop=true
-checkport=true
+checkport=false
 distributor=vinson023

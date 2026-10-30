@@ -5,9 +5,15 @@ services:
     container_name: embyserver
     # 异常退出或宿主机重启后自动拉起
     restart: always
-    # host 模式：Emby 需要局域网自动发现（DLNA/投屏）并对外提供服务端口 8096，
-    # 桥接模式会让发现功能失效
-    network_mode: host
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
+    # 注意：Emby 的端口不开放修改。它把端口写在 /config/config/system.xml 的
+    # HttpServerPortNumber 里，启动脚本又把参数写死了、不接收 compose 的 command，
+    # 硬改会连带破坏 DLNA / 局域网自动发现，所以这里固定 8096。
+    # 真的撞端口了，请停掉应用后改 system.xml 里的 HttpServerPortNumber。
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这行（只打印一条 warning），bridge 模式下生效
+      - "8096:8096"
     environment:
       # 时区，影响媒体库扫描时间与日志
       - TZ=Asia/Shanghai

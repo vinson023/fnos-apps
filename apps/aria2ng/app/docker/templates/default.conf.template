@@ -1,6 +1,17 @@
+# nginx 配置模板：容器启动时由官方 entrypoint 里的 envsubst 生成
+# /etc/nginx/conf.d/default.conf。
+#
+# 只有 ${WEB_PORT} 会被替换（compose 里设了 NGINX_ENVSUBST_FILTER=WEB_PORT），
+# 下面那些 $uri / $host 之类的 nginx 变量原样保留 —— 不设 filter 的话
+# envsubst 会把它们全部替换成空字符串，站点直接废掉。
+#
+# 端口用同一个变量同时决定「容器内监听端口」和「宿主机映射端口」：
+#   host 模式：nginx 直接监听 ${WEB_PORT}，ports 被 Docker 忽略（只警告）
+#   bridge 模式：nginx 监听 ${WEB_PORT}，ports 把 ${WEB_PORT} 映射到同一个号
+# 两种模式下对外都是同一个端口号，用户不用关心自己选的是哪种网络。
 server {
-    listen 6880;
-    listen [::]:6880;
+    listen ${WEB_PORT};
+    listen [::]:${WEB_PORT};
     server_name _;
 
     root /usr/share/nginx/html;

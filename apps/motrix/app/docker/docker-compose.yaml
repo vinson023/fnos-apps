@@ -28,8 +28,9 @@ services:
     environment:
       # 状态目录：SQLite 库、设置、aria2 session、DHT 状态、种子元数据、插件都在这里。
       # 重建容器时少了这个挂载，这些数据全部丢失
-      # Web 监听端口。默认 8080 被多数家宽运营商封禁，改用 8088
-      - PORT=8088
+      # Web 监听端口 = 用户在向导里选的端口（默认 8088）。
+      # 默认的 8080 被多数家宽运营商封禁，所以不用它
+      - PORT=${wizard_web_port}
       - MOTRIX_DATA_DIR=/data
       # 下载中的临时文件，与状态同盘，避免合并时跨设备拷贝
       - MOTRIX_TEMP_DIR=/data/tmp
@@ -76,5 +77,6 @@ services:
     restart: unless-stopped
     network_mode: host
     command:
-      - "TCP6-LISTEN:8088,fork,reuseaddr,ipv6only=1"
-      - "TCP4:127.0.0.1:8088"
+      # 端口跟随上面的 PORT，改了 Web 端口这里会一起变
+      - "TCP6-LISTEN:${wizard_web_port},fork,reuseaddr,ipv6only=1"
+      - "TCP4:127.0.0.1:${wizard_web_port}"

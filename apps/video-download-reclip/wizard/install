@@ -4,7 +4,46 @@
         "items": [
             {
                 "type": "tips",
-                "helpText": "ReClip 用来解析并下载各平台视频/音频，带 Web 界面。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>8899/TCP</b>，请确认未被占用。容器以 root 运行、内存上限 1GB，长时间下载不会把宿主机内存吃满。<br><br>下面一步决定数据放哪里。ReClip 的下载成品与配置都在同一个数据目录里，不单独拆分。"
+                "helpText": "ReClip 用来解析并下载各平台视频/音频，带 Web 界面。容器以 root 运行、内存上限 1GB，长时间下载不会把宿主机内存吃满。<br><br><b>网络模式</b>在下一步选：<b>host</b> 直接占用宿主机端口（默认）；<b>bridge</b> 容器隔离，端口由 Docker 映射。<br><br>⚠️ <b>关于改端口</b>：飞牛应用中心在<b>安装那一刻</b>就把访问地址写进系统数据库了，桌面图标始终指向默认端口 <b>8899</b>。如果你把端口改成别的值，桌面图标会打不开，需要手动访问 <code>http://NAS地址:你选的端口</code>。端口保持默认就不用管这条。<br><br>后面一步决定数据放哪里。ReClip 的下载成品与配置都在同一个数据目录里，不单独拆分。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "网络与端口",
+        "items": [
+            {
+                "type": "radio",
+                "field": "wizard_network_mode",
+                "label": "网络模式",
+                "initValue": "host",
+                "description": "host 让容器直接使用宿主机网络栈，没有 NAT 转换，IPv4/IPv6 都能访问，保持默认即可。bridge 让容器独立组网、只通过映射的端口对外，隔离性更好；如果宿主机的 Docker 网段和你的局域网冲突，选 bridge 反而更合适。",
+                "options": [
+                    {
+                        "label": "host —— 共享宿主机网络（默认）",
+                        "value": "host"
+                    },
+                    {
+                        "label": "bridge —— 容器隔离，端口映射",
+                        "value": "bridge"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_web_port",
+                "label": "Web 端口",
+                "initValue": "8899",
+                "description": "打开 ReClip 页面用的端口，默认 8899。如果这个端口已被别的程序占用，改成一个没被占用的值即可（建议 1024 以上）。注意：改了端口后飞牛桌面图标仍指向 8899，需要手动访问新端口。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写端口"
+                    },
+                    {
+                        "pattern": "^[0-9]{2,5}$",
+                        "message": "端口只能是数字，范围 1-65535"
+                    }
+                ]
             }
         ]
     },

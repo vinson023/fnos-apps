@@ -1,5 +1,5 @@
 appname=emby
-version=1.0.2
+version=1.0.3
 display_name=Emby
 desc=Emby 媒体服务器，将您的个人媒体库变成流媒体服务。
 source=thirdparty

@@ -9,10 +9,14 @@ services:
     # 优雅退出：入口脚本收到 SIGTERM 会先停 nginx、再等 Python 把数据库会话写完。
     # 默认 10 秒不够，任务跑起来时容易在退出瞬间丢状态
     stop_grace_period: 60s
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install
+    network_mode: ${wizard_network_mode}
     ports:
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），bridge 模式下生效。
+      # 前后端口号相同，所以两种模式对外是同一个端口。
       # 3000 是前端 nginx，对外只需要这一个。
       # 后端 FastAPI 监听 3001，只在容器内由 nginx 反代，不对外暴露
-      - "3000:3000"
+      - "${wizard_web_port}:${wizard_web_port}"
     environment:
       - TZ=Asia/Shanghai
       # 容器内以 root 运行：入口脚本要 groupmod/usermod 改 moviepilot 用户，
@@ -22,8 +26,11 @@ services:
       - PUID=0
       - PGID=0
       - UMASK=000
-      # 显式写出前后端端口，避免以后镜像改默认值时静默错位
-      - NGINX_PORT=3000
+      # 显式写出前后端端口，避免以后镜像改默认值时静默错位。
+      # NGINX_PORT 控制前端 nginx 的 listen（镜像里有 nginx.template.conf，
+      # 启动时按这个变量渲染），所以它就是用户看到的 Web 端口。
+      # 后端 PORT 固定 3001，只在容器内被 nginx 反代，不对外
+      - NGINX_PORT=${wizard_web_port}
       - PORT=3001
       # 关掉启动时自动从 GitHub 拉新版覆盖自己。fpk 的版本号应该由包决定，
       # 否则重装一次就被容器内自更新带跑，版本不可控。

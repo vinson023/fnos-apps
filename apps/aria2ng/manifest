@@ -1,5 +1,5 @@
 appname=aria2ng
-version=1.0.5
+version=1.0.6
 display_name=AriaNg
 desc=AriaNg 是 aria2 的纯静态 Web 前端。装完打开页面，在设置里填 aria2 的 RPC 地址与密钥即可使用，不依赖任何后端服务。
 source=thirdparty
@@ -11,5 +11,7 @@ desktop_uidir=ui
 desktop_applaunchname=aria2ng.main
 service_port=6880
 ctl_stop=true
-checkport=true
+# 端口由安装向导决定（wizard_web_port），可能不是 6880。
+# checkport 只能校验这个静态值，用户换了端口就会误报占用，所以关掉。
+checkport=false
 distributor=vinson023

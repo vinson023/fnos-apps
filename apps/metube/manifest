@@ -1,5 +1,5 @@
 appname=metube
-version=1.0.2
+version=1.0.3
 display_name=MeTube
 desc=MeTube 基于 yt-dlp 的自托管视频下载器，带 Web 界面管理下载队列。
 source=thirdparty
@@ -11,5 +11,5 @@ desktop_uidir=ui
 desktop_applaunchname=metube.main
 service_port=8081
 ctl_stop=true
-checkport=true
+checkport=false
 distributor=vinson023

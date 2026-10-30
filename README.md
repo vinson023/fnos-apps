@@ -19,19 +19,21 @@
 
 | 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 | 安装向导可配置 |
 |---|---|---|---|---|---|
-| AriaNg | `aria2ng` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | 无（界面里填，或写服务端 `rpc-config.js`） |
-| Emby | `emby` | 8096 | `amilys/embyserver:latest` | 新页签 | 配置目录、媒体库目录 |
-| Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 下载目录、数据目录 |
-| ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 数据目录 |
-| MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 配置目录、下载目录 |
-| RustDesk Server | `rustdesk` | 21115–21120 | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
-| Motrix | `motrix` | 8088、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | 数据目录、下载目录、登录密码、对外地址 |
-| MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 数据目录、媒体库、下载目录、管理员账号 |
-| WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | 无（只需 SSH 登录目标，有默认值） |
+| AriaNg | `aria2ng` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | 网络模式、Web 端口 |
+| Emby | `emby` | 8096（固定） | `amilys/embyserver:latest` | 新页签 | 网络模式、配置目录、媒体库目录 |
+| Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 网络模式、Web 端口、下载目录、数据目录 |
+| ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 网络模式、Web 端口、数据目录 |
+| MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 网络模式、Web 端口、配置目录、下载目录 |
+| RustDesk Server | `rustdesk` | 21115–21120（固定） | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
+| Motrix | `motrix` | 8088、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | Web 端口、数据目录、下载目录、登录密码、对外地址 |
+| MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 网络模式、Web 端口、数据目录、媒体库、下载目录、管理员账号 |
+| WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
 
-**九个应用里八个带安装向导**：装的时候就能选数据目录、媒体库、下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
-唯一没有向导的是 `aria2ng`——它是纯静态站点，没有任何需要配置的路径。
-`wetty` 的向导只有一个字段（SSH 登录目标），不填也能用。
+**九个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+
+网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
+原因是给了会坏功能（BT 的 P2P、终端的 127.0.0.1、RustDesk 写死在客户端的端口）。
 
 ## 仓库结构
 
@@ -131,6 +133,62 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 容器由 fnOS 通过 Docker API 管理（`config/resource` 里的 `docker-project` 段），
 生命周期脚本以「应用用户」身份运行、**没有 docker 权限**，所以不要在回调里
 `docker compose up`，会报 `code 10237: Docker 服务未运行或无权限访问`。
+
+### 网络模式与端口
+
+向导里有两个通用字段（Emby 只有网络模式）：
+
+| 字段 | 取值 | 说明 |
+|---|---|---|
+| `wizard_network_mode` | `host` / `bridge` | 决定 `network_mode` |
+| `wizard_web_port` | 端口号 | 同时决定容器内监听端口和宿主机端口 |
+
+写法上靠两点做到「一个 compose 兼容两种模式」：
+
+```yaml
+    network_mode: ${wizard_network_mode}
+    ports:
+      - "${wizard_web_port}:${wizard_web_port}"
+```
+
+- **前后端口号相同**：容器内监听的端口就等于用户填的端口，bridge 再把这个号映射出去。
+  所以两种模式对外是同一个端口，用户换模式不用改任何地址。
+- **host 模式下 `ports` 会被 Docker 忽略**，只打印
+  `Published ports are discarded when using host network mode`，不报错。
+  这是让单个 compose 同时兼容两种模式的关键（实测 Docker 27 行为如此）。
+
+应用侧要把端口做成可配置，各家方式不同：
+
+| 应用 | 端口怎么注入 |
+|---|---|
+| AriaNg | nginx 配置模板 + `NGINX_ENVSUBST_FILTER=WEB_PORT`（不设 filter 会把 `$uri` 一起替换掉） |
+| MeTube / Motrix | 环境变量 `PORT` |
+| MoviePilot | 环境变量 `NGINX_PORT`（镜像自带 `nginx.template.conf`） |
+| Music-DL | `command` 里的 `--port` |
+| ReClip | 整条覆盖 `command`，把 gunicorn 的 `-b 0.0.0.0:<port>` 换掉 |
+| WeTTY | `command` 里的 `--port` |
+| Emby | **不开放**：端口在 `config/config/system.xml` 的 `HttpServerPortNumber`，启动脚本不收外部参数 |
+
+#### ⚠️ 改了端口，桌面图标会打不开
+
+这不是包的 bug，是飞牛应用中心的机制限制。**端口在安装那一刻就固化进数据库了**：
+
+```
+安装 → 解压 app.tgz → 读 ui/config → 写入 postgres 的 appcenter.app_service.url
+                                        （形如 ://${host}:6880/）
+桌面图标 → 只读这条记录 → 不再看 ui/config
+```
+
+实测无效的三条路：
+
+- 改 `/vol1/@appcenter/<app>/ui/config` 的 `port` → 桌面仍请求旧端口（改完重启
+  `trim_app_center` 也一样）
+- 改 `/vol1/appcenter-downloads/<app>-<ver>-tpk/manifest` → 同上，那是安装包缓存
+- 在 `install_callback` 里 UPDATE 数据库 → 回调以 `run-as: package` 的应用用户身份运行，
+  PG 走 md5 认证，没有权限
+
+所以：**端口保持默认，桌面图标完全无感；改了端口就得手动访问
+`http://NAS地址:你选的端口`**。向导里已经把这个提示写在端口字段的说明里。
 
 ## 各应用的挂载点
 

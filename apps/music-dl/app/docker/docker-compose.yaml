@@ -4,11 +4,14 @@ services:
     container_name: music-dl
     # 异常退出或宿主机重启后自动拉起
     restart: always
-    # 显式指定启动参数：web 模式、容器内监听 8080、不自动打开浏览器
-    command: ["./music-dl", "web", "--port", "8080", "--no-browser"]
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
+    network_mode: ${wizard_network_mode}
+    # 显式指定启动参数：web 模式、监听用户在向导里选的端口、不自动打开浏览器
+    command: ["./music-dl", "web", "--port", "${wizard_web_port}", "--no-browser"]
     ports:
-      # 宿主机 8099 -> 容器内 8080。端口被占用时安装会失败（manifest 里 checkport=true）
-      - "8099:8080"
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），bridge 模式下生效。
+      # 前后端口号相同，所以两种模式对外是同一个端口。
+      - "${wizard_web_port}:${wizard_web_port}"
     environment:
       # 时区，影响日志与歌曲元数据里的时间
       - TZ=Asia/Shanghai

@@ -5,8 +5,24 @@ services:
     container_name: reclip
     # 异常退出或宿主机重启后自动拉起
     restart: always
-    # host 模式：容器内的下载与解析服务需要直接对外暴露 8899
-    network_mode: host
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），bridge 模式下生效。
+      # 前后端口号相同，所以两种模式对外是同一个端口。
+      - "${wizard_web_port}:${wizard_web_port}"
+    # 镜像默认的 Cmd 把端口写死成 0.0.0.0:8899，这里整条覆盖掉，
+    # 把绑定端口换成用户选的端口。参数与镜像原有 Cmd 保持一致，
+    # 只替换最后的 -b 地址，避免镜像升级后参数对不上。
+    command:
+      - "gunicorn"
+      - "--workers=2"
+      - "--threads=2"
+      - "--worker-tmp-dir"
+      - "/dev/shm"
+      - "-b"
+      - "0.0.0.0:${wizard_web_port}"
+      - "app:app"
     # 以 root 运行，便于写宿主机上的下载目录
     user: "0:0"
     environment:

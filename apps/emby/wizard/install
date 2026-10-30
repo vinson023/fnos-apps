@@ -4,7 +4,29 @@
         "items": [
             {
                 "type": "tips",
-                "helpText": "Emby 是媒体服务器，把本地影音文件整理成可在线播放、可远程访问的流媒体库。<br><br>使用 <b>host 网络模式</b>，会直接占用宿主机 <b>8096/TCP</b>。局域网自动发现（DLNA / 投屏）依赖 host 模式，改成桥接会让发现功能失效。<br><br>下面两步决定数据放哪里：<b>配置目录</b>存数据库、元数据与转码缓存（建议放 SSD），<b>媒体库目录</b>是你已有的影音文件夹。"
+                "helpText": "Emby 是媒体服务器，把本地影音文件整理成可在线播放、可远程访问的流媒体库。<br><br><b>网络模式</b>在下一步选。<b>host</b> 是推荐值：局域网自动发现（DLNA / 投屏）依赖 host 模式，改成 <b>bridge</b> 会让发现功能失效，但 Web 播放本身照常可用。<br><br><b>端口固定 8096，不可在本向导里修改</b>。Emby 把端口写在数据目录的 <code>config/config/system.xml</code> 的 <code>HttpServerPortNumber</code> 里，启动脚本又不接收外部参数，硬改会连带破坏 DLNA。真的和别的程序撞了 8096，请装完后停掉应用、改这个值再启动。<br><br>后面一步决定数据放哪里：<b>配置目录</b>存数据库、元数据与转码缓存（建议放 SSD），<b>媒体库目录</b>是你已有的影音文件夹。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "网络模式",
+        "items": [
+            {
+                "type": "radio",
+                "field": "wizard_network_mode",
+                "label": "网络模式",
+                "initValue": "host",
+                "description": "host 让容器直接使用宿主机网络栈，DLNA / 局域网自动发现和投屏都能正常工作，推荐。bridge 让容器独立组网、只通过映射的 8096 端口对外，隔离性更好，但局域网自动发现会失效（Web 端、客户端直连都不受影响）。",
+                "options": [
+                    {
+                        "label": "host —— 共享宿主机网络，DLNA 可用（推荐）",
+                        "value": "host"
+                    },
+                    {
+                        "label": "bridge —— 容器隔离，DLNA 失效",
+                        "value": "bridge"
+                    }
+                ]
             }
         ]
     },

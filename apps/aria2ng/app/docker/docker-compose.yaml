@@ -5,19 +5,31 @@ services:
     container_name: aria2ng
     # 异常退出或宿主机重启后自动拉起
     restart: always
-    # host 模式：直接占用宿主机 6880，不用端口映射，
-    # 也避开了端口映射在 IPv4/IPv6 双栈下的差异
-    network_mode: host
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
+    # host：直接占用宿主机端口，不做 NAT，性能最好，也天然同时吃 IPv4/IPv6。
+    # bridge：容器隔离，端口通过下面的 ports 映射出去。
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），
+      # bridge 模式下生效。前后端口号相同，所以两种模式对外是同一个端口。
+      - "${wizard_web_port}:${wizard_web_port}"
     environment:
       # 时区，影响日志时间
       - TZ=Asia/Shanghai
+      # nginx 的监听端口 = 用户在向导里选的端口。
+      # 模板里的 ${WEB_PORT} 由它替换，这样 host/bridge 两种模式监听同一个号。
+      - WEB_PORT=${wizard_web_port}
+      # 限定 envsubst 只替换 WEB_PORT，否则 nginx 配置里的 $uri / $host
+      # 也会被替换成空字符串，整个站点会 404。
+      - NGINX_ENVSUBST_FILTER=WEB_PORT
     volumes:
       # AriaNg 静态站随包分发，不依赖宿主机外部目录。
       # ${TRIM_APPDEST} 是 fnOS 注入的安装路径，实际为 /vol1/@appcenter/aria2ng
       - ${TRIM_APPDEST}/docker/html:/usr/share/nginx/html:ro
-      # 站点配置：只做静态托管，不含任何反向代理。
-      # AriaNg 直接以浏览器的身份去连 aria2 的 RPC 端口（aria2 自带 CORS 头）
-      - ${TRIM_APPDEST}/docker/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # 站点配置模板：镜像启动时由 entrypoint 里的 envsubst 渲染到
+      # /etc/nginx/conf.d/default.conf。这里挂目录而不是挂单个文件，
+      # 因为渲染产物必须落在容器内可写层，不能被只读挂载顶掉。
+      - ${TRIM_APPDEST}/docker/templates:/etc/nginx/templates:ro
       # 跟随宿主机时区
       - /etc/localtime:/etc/localtime:ro
     # 纯静态文件托管，128MB 绰绰有余

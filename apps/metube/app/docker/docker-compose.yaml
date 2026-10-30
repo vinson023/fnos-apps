@@ -5,9 +5,14 @@ services:
     container_name: metube
     # 异常退出或宿主机重启后自动拉起
     restart: always
-    # host 模式：容器内 PORT 直接占用宿主机 8081，不再做端口映射。
-    # 同时避免桥接模式下 yt-dlp 走 NAT 的额外开销
-    network_mode: host
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
+    # host：PORT 直接占用宿主机端口，没有 NAT，yt-dlp 下载也不多绕一层。
+    # bridge：容器隔离，端口通过下面的 ports 映射出去。
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），bridge 模式下生效。
+      # 前后端口号相同，所以两种模式对外是同一个端口。
+      - "${wizard_web_port}:${wizard_web_port}"
     environment:
       # 时区，影响下载任务与日志时间
       - TZ=Asia/Shanghai
@@ -17,8 +22,9 @@ services:
       - PGID=1000
       # 新建文件的权限掩码，022 表示组内与其他用户可读
       - UMASK=022
-      # 容器内监听端口，需与 manifest 的 service_port 一致
-      - PORT=8081
+      # 容器内监听端口 = 用户在向导里选的端口。
+      # 和 ports 用同一个变量，host/bridge 两种模式对外端口天然一致
+      - PORT=${wizard_web_port}
       # 成品落盘目录（容器内路径）
       - DOWNLOAD_DIR=/downloads
       # 队列状态与配置的持久化目录（容器内路径）

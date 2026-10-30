@@ -21,9 +21,11 @@ services:
       # 跟随宿主机时区
       - /etc/localtime:/etc/localtime:ro
     command:
-      # 监听端口，需与 manifest 的 service_port、ui/config 的 port 一致
+      # 监听端口 = 用户在向导里选的端口。
+      # 注意这里固定 host 网络（不提供 bridge 选项）：只有 host 网络下 127.0.0.1
+      # 才指向宿主机，下面的 ssh 才能登进飞牛本身而不是容器自己
       - "--port"
-      - "3002"
+      - "${wizard_web_port}"
       - "--host"
       - "0.0.0.0"
       # 直接挂在根路径，桌面图标打开就是终端，不用再拼 /wetty/
