@@ -1,0 +1,15 @@
+appname=termix
+version=1.0.1
+display_name=Termix
+desc=Termix 是自托管的服务器管理平台，浏览器里提供 SSH 终端、文件管理、隧道与远程桌面。
+source=thirdparty
+platform=all
+developer=vinson023
+publisher=vinson023
+maintainer=vinson023
+desktop_uidir=ui
+desktop_applaunchname=termix.main
+service_port=7080
+ctl_stop=true
+checkport=false
+distributor=vinson023

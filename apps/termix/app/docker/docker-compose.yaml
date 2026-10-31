@@ -1,0 +1,49 @@
+services:
+  termix:
+    # 自托管服务器管理平台：SSH 终端、文件管理、隧道、远程桌面
+    # 用 Docker Hub 上的 termixssh/termix，走飞牛的 registry mirror 加速；
+    # 官方另一处 ghcr.io/termix-ssh/termix 是同一镜像，但 ghcr 不走加速会慢很多
+    image: termixssh/termix:latest
+    container_name: termix
+    # 异常退出或宿主机重启后自动拉起
+    restart: always
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
+    # host 下才能连宿主机自己的 127.0.0.1 服务，也便于访问同网段的局域网设备
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），bridge 模式下生效。
+      # 前后端口号相同，所以两种模式对外是同一个端口
+      - "${wizard_web_port}:${wizard_web_port}"
+    environment:
+      # 时区，影响连接日志与录制文件时间
+      - TZ=Asia/Shanghai
+      # Web UI 与 API 的监听端口 = 用户在向导里选的端口。
+      # 和 ports 用同一个变量，host/bridge 两种模式对外端口天然一致
+      - PORT=${wizard_web_port}
+    volumes:
+      # 数据库、密钥、插件、上传与录制全在这里。丢了就等于丢了所有主机和凭据
+      - ${wizard_data_dir}:/app/data
+      # 跟随宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+    # 说明：
+    # 1) 镜像自带 guacd（远程桌面）与内置插件，不需要额外的边车容器。
+    # 2) 不设 PUID/PGID：容器默认以自身用户运行，bind mount 目录由 Docker 创建，
+    #    实测不需要额外指定属主。若以后改成只读挂载或换属主再考虑加。
+    # 3) 不启用 ENABLE_SSL：内网走 http，外网访问请自己套反向代理。
+
+  # ---------------------------------------------------------------------------
+  # IPv6 边车：Termix 的 nginx 模板写的是 `listen ${PORT};`，只监听 IPv4，
+  # 而本机只有公网 IPv6、没有公网 IPv4 —— 不加这一层，外网根本连不进来。
+  # 用 socat 在 IPv6 上开同一个端口，转给 127.0.0.1 的 IPv4 监听。
+  # ipv6only=1 必需：否则 Linux 双栈 socket 会连 IPv4 一起占，和主容器抢端口。
+  # ---------------------------------------------------------------------------
+  termix-v6:
+    image: alpine/socat:latest
+    container_name: termix-v6
+    # host 模式下才需要它；bridge 模式下 Docker 的 docker-proxy 本来就是双栈监听，
+    # 此时本容器会因端口已被占用而启动失败。限制只重试 1 次，避免无限重启刷日志。
+    restart: on-failure:1
+    network_mode: host
+    command:
+      - "TCP6-LISTEN:${wizard_web_port},fork,reuseaddr,ipv6only=1"
+      - "TCP4:127.0.0.1:${wizard_web_port}"

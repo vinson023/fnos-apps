@@ -29,8 +29,9 @@
 | MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 网络模式、Web 端口、数据目录、媒体库、下载目录、管理员账号 |
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
 | Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 网络模式、Web 端口、数据目录、加密密钥 |
+| Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 网络模式、Web 端口、数据目录 |
 
-**十个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十一个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
@@ -54,7 +55,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（十个应用全都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十一个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -169,6 +170,7 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 | ReClip | 整条覆盖 `command`，把 gunicorn 的 `-b 0.0.0.0:<port>` 换掉 |
 | WeTTY | `command` 里的 `--port` |
 | Nexterm | 环境变量 `SERVER_PORT`；另有一个内部通信端口 `CONTROL_PLANE_PORT`，**固定写死 7989**（见下） |
+| Termix | 环境变量 `PORT`；IPv6 靠一个 `socat` 边车补（见下） |
 | Emby | **不开放**：端口在 `config/config/system.xml` 的 `HttpServerPortNumber`，启动脚本不收外部参数 |
 
 #### Nexterm 的 7989：一个必须绕开的坑
@@ -185,6 +187,30 @@ Uncaught exception ... EADDRINUSE
 server 进程直接崩，容器无限重启（`RestartCount` 一路涨），Web 端口完全没响应。
 `docker-start.sh` 里 engine 的 config.yaml 用的是 `${CONTROL_PLANE_PORT:-7800}`，
 所以 compose 里设 `CONTROL_PLANE_PORT=7989` 就能同时改掉两端，一劳永逸。
+
+#### Termix：IPv4-only 的 nginx，靠 socat 边车补 IPv6
+
+Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7080`）。
+如果宿主机只有公网 IPv6、没有公网 IPv4，外网根本连不进来 —— 实测 `curl -6` 直接 000。
+
+不改上游镜像，用和 Motrix 同一套办法：加一个 `alpine/socat` 边车，在 IPv6 上开同一个端口，
+转发给 `127.0.0.1` 的 IPv4 监听。`ipv6only=1` 同样必需，否则会和主容器抢端口。
+
+```yaml
+  termix-v6:
+    image: alpine/socat:latest
+    restart: on-failure:1        # bridge 模式下 docker-proxy 已双栈，这里会失败，限制只重试 1 次
+    network_mode: host
+    command:
+      - "TCP6-LISTEN:${wizard_web_port},fork,reuseaddr,ipv6only=1"
+      - "TCP4:127.0.0.1:${wizard_web_port}"
+```
+
+> **为什么 Termix 的桌面图标是新页签而不是 iframe？**
+> 它自己下发了 `X-Frame-Options: DENY` 和 CSP 的 `frame-ancestors 'none'`（防点击劫持），
+> 浏览器会拒绝把它嵌进飞牛桌面。要强行内嵌只能覆盖它的 nginx 模板，而模板有 18KB、
+> 随镜像版本变化，覆盖后升级容易出问题，所以这里尊重应用本身的安全策略，用新页签打开。
+> 判断方法：`curl -sI http://127.0.0.1:<port>/ | grep -i x-frame`，有 `DENY` 就只能走新页签。
 
 #### ⚠️ 改了端口，桌面图标会打不开
 

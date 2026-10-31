@@ -1,0 +1,13 @@
+{
+    ".url": {
+        "termix.main": {
+            "title": "Termix",
+            "icon": "images/icon_{0}.png",
+            "type": "url",
+            "protocol": "",
+            "port": "7080",
+            "url": "/?v=1.0.1",
+            "allUsers": false
+        }
+    }
+}
