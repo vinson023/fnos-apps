@@ -28,8 +28,9 @@
 | Motrix | `motrix` | 8088、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | Web 端口、数据目录、下载目录、登录密码、对外地址 |
 | MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 网络模式、Web 端口、数据目录、媒体库、下载目录、管理员账号 |
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
+| Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 网络模式、Web 端口、数据目录、加密密钥 |
 
-**九个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
@@ -53,7 +54,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（九个应用里八个有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -167,7 +168,23 @@ volumes: - ${wizard_data_dir}/config:/config   ← 挂载真的落在用户选�
 | Music-DL | `command` 里的 `--port` |
 | ReClip | 整条覆盖 `command`，把 gunicorn 的 `-b 0.0.0.0:<port>` 换掉 |
 | WeTTY | `command` 里的 `--port` |
+| Nexterm | 环境变量 `SERVER_PORT`；另有一个内部通信端口 `CONTROL_PLANE_PORT`，**固定写死 7989**（见下） |
 | Emby | **不开放**：端口在 `config/config/system.xml` 的 `HttpServerPortNumber`，启动脚本不收外部参数 |
+
+#### Nexterm 的 7989：一个必须绕开的坑
+
+Nexterm 是 server + engine 双进程架构，engine 通过 `127.0.0.1:7800` 连 server 的控制面。
+这个 7800 **极容易撞车**——飞牛上装了 drawio 就会占 `0.0.0.0:7800`，而 `docker-proxy`
+绑的是通配地址，会压过 Nexterm 的 `127.0.0.1:7800`。撞上之后的现象是：
+
+```
+[error] Control plane server error EADDRINUSE: address already in use 127.0.0.1:7800
+Uncaught exception ... EADDRINUSE
+```
+
+server 进程直接崩，容器无限重启（`RestartCount` 一路涨），Web 端口完全没响应。
+`docker-start.sh` 里 engine 的 config.yaml 用的是 `${CONTROL_PLANE_PORT:-7800}`，
+所以 compose 里设 `CONTROL_PLANE_PORT=7989` 就能同时改掉两端，一劳永逸。
 
 #### ⚠️ 改了端口，桌面图标会打不开
 

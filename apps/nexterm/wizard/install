@@ -1,0 +1,89 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "Nexterm 是一个跑在浏览器里的服务器管理器，把 SSH、VNC、RDP、Telnet 连接集中到一处：左侧是你的连接清单，点开就在页面内开终端或远程桌面，不用再装一堆客户端。装好后从桌面图标打开即可使用。<br><br><b>网络模式</b>在下一步选：<b>host</b> 直接共享宿主机网络栈，官方推荐——「唤醒局域网设备（WOL）」和「连接本机 127.0.0.1 上的服务」这两类功能只有 host 模式才正常；<b>bridge</b> 容器独立组网，隔离性更好，但上面两项功能会失效。<br><br>⚠️ <b>关于改端口</b>：飞牛应用中心在<b>安装那一刻</b>就把访问地址写进系统数据库了，桌面图标始终指向默认端口 <b>6989</b>。如果你把端口改成别的值，桌面图标会打不开，需要手动访问 <code>http://NAS地址:你选的端口</code>。端口保持默认就不用管这条。<br><br>⚠️ <b>Nexterm 目前仍是 beta 版本</b>，官方明确建议定期备份数据。你的连接配置和凭据都存在下一步选的<b>数据目录</b>里，备份那个目录即可。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "网络与端口",
+        "items": [
+            {
+                "type": "radio",
+                "field": "wizard_network_mode",
+                "label": "网络模式",
+                "initValue": "host",
+                "description": "host 让容器直接使用宿主机网络栈，官方推荐：唤醒局域网设备（WOL）和连接本机服务都需要它，IPv4/IPv6 也都能访问。bridge 让容器独立组网、只通过映射的端口对外，隔离性更好；如果你的局域网网段和 Docker 默认网段冲突，选 bridge 更合适，但要接受 WOL 与本机连接不可用。",
+                "options": [
+                    {
+                        "label": "host —— 共享宿主机网络（官方推荐）",
+                        "value": "host"
+                    },
+                    {
+                        "label": "bridge —— 容器隔离，端口映射",
+                        "value": "bridge"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_web_port",
+                "label": "Web 端口",
+                "initValue": "6989",
+                "description": "打开 Nexterm 页面用的端口，默认 6989。如果这个端口已被别的程序占用，改成一个没被占用的值即可（建议 1024 以上）。注意：改了端口后飞牛桌面图标仍指向 6989，需要手动访问新端口。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写端口"
+                    },
+                    {
+                        "pattern": "^[0-9]{2,5}$",
+                        "message": "端口只能是数字，范围 1-65535"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "stepTitle": "数据与加密密钥",
+        "items": [
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "数据目录",
+                "initValue": "/vol1/1000/docker/nexterm",
+                "description": "连接清单、用户账号、以及加密后的凭据都存在这里。目录不存在会自动创建。Nexterm 还是 beta，建议定期备份这个目录。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写数据目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_encryption_key",
+                "label": "加密密钥",
+                "initValue": "e8837744008c8f5bc21be7feec37ea68fba8da2bea28893a168b301056e00e01",
+                "description": "用来加密你保存的密码、SSH 私钥和口令。已预填一个随机密钥，可以直接用，也可以用 openssl rand -hex 32 自己生成一个替换。⚠️ 这个值一旦确定就不要再改：换掉它之后，之前保存的所有凭据都无法解密，必须重新录入一遍。请把密钥和备份一起保存。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写加密密钥"
+                    },
+                    {
+                        "pattern": "^[A-Za-z0-9._-]{16,128}$",
+                        "message": "密钥需为 16-128 位，只能包含字母、数字、点、下划线、短横线"
+                    }
+                ]
+            }
+        ]
+    }
+]

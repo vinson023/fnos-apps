@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "nexterm.main": {
+            "title": "Nexterm",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "6989",
+            "url": "/?v=1.0.2",
+            "width": 1200,
+            "height": 800,
+            "allUsers": false
+        }
+    }
+}

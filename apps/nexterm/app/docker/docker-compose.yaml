@@ -1,0 +1,38 @@
+services:
+  nexterm:
+    # 基于 Web 的服务器管理器：SSH / VNC / RDP / Telnet 统一在浏览器里管
+    # aio = server + engine 打包在同一个容器，单容器即可用
+    image: nexterm/aio:latest
+    container_name: nexterm
+    # 异常退出或宿主机重启后自动拉起
+    restart: always
+    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
+    # 官方推荐 host：Wake-on-LAN 与「连 localhost 上的服务」都依赖宿主机网络栈。
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这两行（只打印一条 warning），bridge 模式下生效。
+      # 前后端口号相同，所以两种模式对外是同一个端口。
+      - "${wizard_web_port}:${wizard_web_port}"
+    environment:
+      # 时区，影响连接日志时间
+      - TZ=Asia/Shanghai
+      # 容器内监听端口 = 用户在向导里选的端口（Nexterm 支持 SERVER_PORT 覆盖）。
+      # 和 ports 用同一个变量，host/bridge 两种模式对外端口天然一致
+      - SERVER_PORT=${wizard_web_port}
+      # 加密密钥：保存的密码、SSH 私钥、口令都用它加密落盘。
+      # 一旦更换或丢失，已有连接凭据全部无法解密，必须重新录入
+      - ENCRYPTION_KEY=${wizard_encryption_key}
+      # 引擎与 server 之间的内部通信端口，默认 7800。
+      # 实测飞牛上 7800 常被 drawio 之类映射走（0.0.0.0:7800），
+      # 一旦冲突 server 会 EADDRINUSE 崩溃并无限重启，所以固定到 7989。
+      # 这个端口只监听 127.0.0.1，不对外暴露，用户无需关心。
+      - CONTROL_PLANE_PORT=7989
+    volumes:
+      # 连接配置、凭据、用户数据的持久化目录（容器内路径固定 /app/data）
+      - ${wizard_data_dir}:/app/data
+      # 跟随宿主机时区
+      - /etc/localtime:/etc/localtime:ro
+    # 说明：
+    # 1) host 模式下 CONTROL_PLANE_PORT（上面固定为 7989）会占用宿主机端口。
+    #    它只监听 127.0.0.1，属于容器内部通信，不对外提供访问。
+    # 2) 不设 mem_limit：RDP / VNC 会话会按需占用较多内存，加硬上限容易断连。
