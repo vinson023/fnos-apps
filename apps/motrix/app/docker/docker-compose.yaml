@@ -66,17 +66,12 @@ services:
       - /etc/localtime:/etc/localtime:ro
     restart: unless-stopped
 
-  # Motrix 的 Web 服务把绑定地址写死成 0.0.0.0，只监听 IPv4；
-  # 而本机外网只有公网 IPv6（没有公网 IPv4），所以补一层只监听 IPv6 的转发。
-  # socat 用 ipv6only=1 只占 [::]:8088，与 motrix 的 0.0.0.0:8088 不冲突，
-  # 于是内网走 IPv4、外网走 IPv6，两边都是同一个 8088 端口。
-  # 为什么不用 8080：多数家宽运营商会封 8080，实测 8088 未被封。
-  motrix-v6:
-    image: alpine/socat:latest
-    container_name: motrix-v6
-    restart: unless-stopped
-    network_mode: host
-    command:
-      # 端口跟随上面的 PORT，改了 Web 端口这里会一起变
-      - "TCP6-LISTEN:${wizard_web_port},fork,reuseaddr,ipv6only=1"
-      - "TCP4:127.0.0.1:${wizard_web_port}"
+  # 关于 IPv6：这里不再加转发边车。
+  #
+  # Motrix 的 Web 服务把绑定地址写死成 0.0.0.0（服务端入口里是字面量，没有环境变量可改），
+  # 所以它只监听 IPv4。1.0.5 之前为此加过一个只监听 [::]:8088 的转发容器，
+  # 但实测发现这条路是多余的：外网访问走的是域名 → 路由器 TCP 转发 → NAS 的 IPv4，
+  # 全程不经过那个容器。停掉之后，内网、域名外网都是 200，下载完全不受影响。
+  #
+  # 代价：不能再用 http://[NAS的公网IPv6]:8088 直接访问。用域名就够了。
+  # 下载功能与 Web 端口无关：aria2 走的是出站连接（连 tracker / peer / HTTP 源）。
