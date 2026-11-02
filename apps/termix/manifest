@@ -1,5 +1,5 @@
 appname=termix
-version=1.0.1
+version=1.0.2
 display_name=Termix
 desc=Termix 是自托管的服务器管理平台，浏览器里提供 SSH 终端、文件管理、隧道与远程桌面。
 source=thirdparty

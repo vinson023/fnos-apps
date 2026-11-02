@@ -6,7 +6,7 @@
             "type": "url",
             "protocol": "",
             "port": "7080",
-            "url": "/?v=1.0.1",
+            "url": "/?v=1.0.2",
             "allUsers": false
         }
     }

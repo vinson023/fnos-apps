@@ -30,20 +30,5 @@ services:
     # 2) 不设 PUID/PGID：容器默认以自身用户运行，bind mount 目录由 Docker 创建，
     #    实测不需要额外指定属主。若以后改成只读挂载或换属主再考虑加。
     # 3) 不启用 ENABLE_SSL：内网走 http，外网访问请自己套反向代理。
-
-  # ---------------------------------------------------------------------------
-  # IPv6 边车：Termix 的 nginx 模板写的是 `listen ${PORT};`，只监听 IPv4，
-  # 而本机只有公网 IPv6、没有公网 IPv4 —— 不加这一层，外网根本连不进来。
-  # 用 socat 在 IPv6 上开同一个端口，转给 127.0.0.1 的 IPv4 监听。
-  # ipv6only=1 必需：否则 Linux 双栈 socket 会连 IPv4 一起占，和主容器抢端口。
-  # ---------------------------------------------------------------------------
-  termix-v6:
-    image: alpine/socat:latest
-    container_name: termix-v6
-    # host 模式下才需要它；bridge 模式下 Docker 的 docker-proxy 本来就是双栈监听，
-    # 此时本容器会因端口已被占用而启动失败。限制只重试 1 次，避免无限重启刷日志。
-    restart: on-failure:1
-    network_mode: host
-    command:
-      - "TCP6-LISTEN:${wizard_web_port},fork,reuseaddr,ipv6only=1"
-      - "TCP4:127.0.0.1:${wizard_web_port}"
+    # 4) 不需要 IPv6 边车：外网是「域名 → 路由器 → 转发到本机 IPv4:端口」，
+    #    只要求本机在 IPv4 上监听，跟是否监听 IPv6 无关。
