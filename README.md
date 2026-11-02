@@ -256,7 +256,6 @@ Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7
 | `motrix` | `wizard_data_dir` | `/vol1/1000/docker/motrix` | `/data`（其下 `data` 子目录） |
 | `motrix` | `wizard_download_dir` | `/vol1/1000/Download` | `/downloads` |
 | `motrix` | `wizard_operator_token` | 无（必须自己设） | Web 登录密码 |
-| `motrix` | `wizard_public_url` | 留空 | 远程配对审批地址，非挂载 |
 | `moviepilot` | `wizard_data_dir` | `/vol1/1000/docker/moviepilot` | `/config` 与 `/moviepilot/.cloakbrowser`（两个子目录） |
 | `moviepilot` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
 | `moviepilot` | `wizard_download_dir` | `/vol1/1000/Download` | `/downloads` |
@@ -512,6 +511,11 @@ environment:
      **域名 → 路由器端口转发 → NAS 的 IPv4**，全程不经过那个容器。停掉之后内网、
      域名外网都是 200，下载完全不受影响（aria2 走的是出站连接）。
      代价是不能再用 `http://[NAS的公网IPv6]:8088` 直连——用域名就够了。
+   - **不设 `MOTRIX_PUBLIC_URL`**（1.0.7 起）。服务端拿它做 WebSocket 的 origin 校验，
+     `expectedBrowserOrigin` 优先取它、取不到才回退到请求的 `Host` 头。一旦设成某个固定地址，
+     用另一个地址访问就会 `origin-mismatch` 被 403，表现为**界面能打开、但任务进度和速度不刷新**
+     （日志关键字 `operator event connection rejected`）。不设它 → 内网用 IP、外网用域名都正常。
+     注意不能设成空字符串：`"" ?? fallback` 的结果是 `""`，会导致所有来源都被拒。
 
 与 AriaNg 的关系：两者都是 aria2 前端，但**不冲突**。Motrix 用容器内的 aria2
 （`16800`，只监听 loopback），和独立部署的 `aria2-pro`（`6800`）是两个互不相干的引擎。

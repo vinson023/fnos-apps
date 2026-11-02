@@ -47,9 +47,13 @@ services:
       # host 模式下等于直接监听宿主机 16801
       - MOTRIX_MDXP_HOST=0.0.0.0
       - MOTRIX_MDXP_PORT=16801
-      # 配对时回给客户端的 Web 审批地址。留空只会让日志多一条 warning，
-      # 不影响 Web 界面和下载功能
-      - MOTRIX_PUBLIC_URL=${wizard_public_url}
+      # 刻意不设 MOTRIX_PUBLIC_URL。
+      # 服务端用它做 WebSocket 的 origin 校验（expectedBrowserOrigin 优先取它，取不到才回退到
+      # 请求的 Host 头）。一旦设成某个固定地址，用另一个地址访问就会 origin-mismatch 被 403，
+      # 表现为界面能打开、但任务进度和速度不刷新（日志：operator event connection rejected）。
+      # 不设它 → 服务端按请求的 Host 头判断 → 内网用 IP、外网用域名都正常。
+      # 代价：远程 CLI / 浏览器扩展配对时拿不到审批链接，Web 使用不受影响。
+      # 注意不能设成空字符串："" ?? fallback 的结果是 ""，会导致所有来源都被拒。
       # 服务端「主机语言」。aria2 / 插件的提示、以及设置里 language=system 时的
       # 兜底语言都取自这里，不设会退回 LANG（镜像里是空的）→ 英文
       - MOTRIX_HOST_LANGUAGE=zh-CN

@@ -16,7 +16,7 @@
                 "field": "wizard_web_port",
                 "label": "Web 端口",
                 "initValue": "8088",
-                "description": "打开 Motrix Web 界面用的端口，默认 8088（8080 被多数家宽运营商封禁，所以不用它）。如果 8088 已被别的程序占用，改成一个没被占用的值即可。注意：改了端口后飞牛桌面图标仍指向 8088，需要手动访问新端口；另外「对外访问地址」里的端口也要跟着改。",
+                "description": "打开 Motrix Web 界面用的端口，默认 8088（8080 被多数家宽运营商封禁，所以不用它）。如果 8088 已被别的程序占用，改成一个没被占用的值即可。注意：改了端口后飞牛桌面图标仍指向 8088，需要手动访问新端口。",
                 "rules": [
                     {
                         "required": true,
@@ -70,7 +70,7 @@
         ]
     },
     {
-        "stepTitle": "登录与远程访问",
+        "stepTitle": "登录密码",
         "items": [
             {
                 "type": "password",
@@ -94,20 +94,8 @@
                 ]
             },
             {
-                "type": "text",
-                "field": "wizard_public_url",
-                "label": "对外访问地址（可留空）",
-                "description": "只在用远程命令行（@motrix/cli）或浏览器扩展配对时才需要：客户端会拿到这个地址去申请授权。格式如 http://192.168.5.141:8088，必须是别的设备能访问到的地址，不能填 localhost。留空不影响 Web 使用，只是配对时客户端拿不到可用的审批链接。",
-                "rules": [
-                    {
-                        "pattern": "^$|^https?://[A-Za-z0-9._:-]+(/[A-Za-z0-9._/-]*)?$",
-                        "message": "留空，或填 http(s)://主机:端口 形式的地址"
-                    }
-                ]
-            },
-            {
                 "type": "tips",
-                "helpText": "密码忘记时可以从 NAS 上查看：<b>/vol1/@appconf/motrix/info.txt</b>（安装时留了一份，需要 root 或管理员权限）。"
+                "helpText": "密码忘记时可以从 NAS 上查看：<b>/vol1/@appconf/motrix/info.txt</b>（安装时留了一份，需要 root 或管理员权限）。<br><br>本版本<b>不再需要填「对外访问地址」</b>：服务端会按你访问时用的地址自动判断，内网用 IP、外网用域名都能正常显示实时进度。"
             }
         ]
     }

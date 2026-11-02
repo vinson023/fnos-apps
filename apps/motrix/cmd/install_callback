@@ -15,7 +15,6 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="$(wiz wizard_data_dir "${FNOS_DATA_DIR:-/vol1/1000/docker}/motrix")"
 DL_DIR="$(wiz wizard_download_dir "${DOWNLOAD_DIR:-/vol1/1000/Download}")"
 TOKEN="$(wiz wizard_operator_token "")"
-PUBLIC_URL="$(wiz wizard_public_url "")"
 
 mkdir -p "${TRIM_PKGETC}" 2>/dev/null
 
@@ -26,7 +25,6 @@ DATA_DIR=${DATA_DIR}
 DOWNLOAD_DIR=${DL_DIR}
 WEB_URL=http://<NAS地址>:${WEB_PORT}
 OPERATOR_TOKEN=${TOKEN}
-PUBLIC_URL=${PUBLIC_URL}
 INSTALLED_AT=$(date '+%F %T')
 INFO
 
