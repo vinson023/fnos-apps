@@ -2,7 +2,8 @@ services:
   moviepilot:
     # 官方 v2 镜像：FastAPI 后端 + nginx 前端 + CloakBrowser 浏览器内核，
     # 多架构标签存在但实际只有 amd64（见 manifest 与 README）
-    image: jxxghp/moviepilot-v2:latest
+    # 版本标签由安装向导决定（latest / beta），见 wizard/install
+    image: jxxghp/moviepilot-v2:${wizard_image_tag}
     container_name: moviepilot
     # 入口脚本自己用 tini 托管进程，这里不能再加 init: true，否则会有两份 init
     #

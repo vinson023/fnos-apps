@@ -9,8 +9,25 @@
         ]
     },
     {
-        "stepTitle": "网络模式",
+        "stepTitle": "版本与网络",
         "items": [
+            {
+                "type": "radio",
+                "field": "wizard_image_tag",
+                "label": "镜像版本",
+                "initValue": "latest",
+                "description": "latest 跟随 Emby 正式版，当前 4.10.2.0（2026-10 构建）。beta 跟随官方测试版，当前 4.10.0.11（2026-08 构建）——注意它比 latest 旧，上游近几个月没推新 beta，只有想提前试新功能时才选 beta。",
+                "options": [
+                    {
+                        "label": "latest —— 正式版 4.10.2.0（推荐）",
+                        "value": "latest"
+                    },
+                    {
+                        "label": "beta —— 测试版 4.10.0.11，比 latest 旧",
+                        "value": "beta"
+                    }
+                ]
+            },
             {
                 "type": "radio",
                 "field": "wizard_network_mode",

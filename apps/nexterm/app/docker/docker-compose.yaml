@@ -2,7 +2,8 @@ services:
   nexterm:
     # 基于 Web 的服务器管理器：SSH / VNC / RDP / Telnet 统一在浏览器里管
     # aio = server + engine 打包在同一个容器，单容器即可用
-    image: nexterm/aio:latest
+    # 版本标签由安装向导决定（latest / development），见 wizard/install
+    image: nexterm/aio:${wizard_image_tag}
     container_name: nexterm
     # 异常退出或宿主机重启后自动拉起
     restart: always

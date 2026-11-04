@@ -1,7 +1,8 @@
 services:
   embyserver:
     # 第三方构建的 Emby Server 镜像，自带硬件转码依赖
-    image: amilys/embyserver:latest
+    # 版本标签由安装向导决定（latest / beta），见 wizard/install
+    image: amilys/embyserver:${wizard_image_tag}
     container_name: embyserver
     # 异常退出或宿主机重启后自动拉起
     restart: always

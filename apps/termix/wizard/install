@@ -9,8 +9,25 @@
         ]
     },
     {
-        "stepTitle": "网络与端口",
+        "stepTitle": "版本与网络",
         "items": [
+            {
+                "type": "radio",
+                "field": "wizard_image_tag",
+                "label": "镜像版本",
+                "initValue": "latest",
+                "description": "latest = 26.11.0 正式版（2026-11-01 构建）。beta = 26.11.1-beta.1（2026-11-03 构建），比正式版更新，但作者标了 beta、没做完整验证。Termix 迭代很快，想要最新功能选 beta，求稳选 latest。",
+                "options": [
+                    {
+                        "label": "latest —— 正式版 26.11.0（推荐）",
+                        "value": "latest"
+                    },
+                    {
+                        "label": "beta —— 26.11.1-beta.1，比正式版新",
+                        "value": "beta"
+                    }
+                ]
+            },
             {
                 "type": "radio",
                 "field": "wizard_network_mode",

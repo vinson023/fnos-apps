@@ -9,8 +9,25 @@
         ]
     },
     {
-        "stepTitle": "网络与端口",
+        "stepTitle": "版本与网络",
         "items": [
+            {
+                "type": "radio",
+                "field": "wizard_image_tag",
+                "label": "镜像版本",
+                "initValue": "latest",
+                "description": "latest 跟随正式版，当前 2.15.6（2026-08 构建）。beta 是作者的测试分支，当前构建于 2026-07-30、版本号低于 latest——上游近期没推新 beta，选它等于回退一版，只在排查问题或试新功能时用，回退后数据库可能有兼容问题。",
+                "options": [
+                    {
+                        "label": "latest —— 正式版 2.15.6（推荐）",
+                        "value": "latest"
+                    },
+                    {
+                        "label": "beta —— 测试分支，比 latest 旧一版",
+                        "value": "beta"
+                    }
+                ]
+            },
             {
                 "type": "radio",
                 "field": "wizard_network_mode",

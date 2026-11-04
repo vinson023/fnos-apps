@@ -9,8 +9,25 @@
         ]
     },
     {
-        "stepTitle": "网络与端口",
+        "stepTitle": "版本与网络",
         "items": [
+            {
+                "type": "radio",
+                "field": "wizard_image_tag",
+                "label": "镜像版本",
+                "initValue": "latest",
+                "description": "latest = 1.2.2-BETA，官方当前的发布版（Nexterm 整个项目还在 beta 阶段，所以两个选项都算测试版）。development = 开发分支，每次提交自动构建，比 latest 新但更不稳定，可能遇到数据库结构变更、回退时数据不兼容。不确定就选 latest。",
+                "options": [
+                    {
+                        "label": "latest —— 1.2.2-BETA，官方发布版（推荐）",
+                        "value": "latest"
+                    },
+                    {
+                        "label": "beta（development）—— 开发分支，最新但不稳定",
+                        "value": "development"
+                    }
+                ]
+            },
             {
                 "type": "radio",
                 "field": "wizard_network_mode",

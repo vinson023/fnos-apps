@@ -19,20 +19,26 @@
 
 | 应用 | appname | 端口 | 容器镜像 | 桌面打开方式 | 安装向导可配置 |
 |---|---|---|---|---|---|
-| AriaNg | `aria2ng` | 6880 | `nginx:alpine`（托管 AriaNg 静态站） | iframe 窗口 1280×860 | 网络模式、Web 端口 |
-| Emby | `emby` | 8096（固定） | `amilys/embyserver:latest` | 新页签 | 网络模式、配置目录、媒体库目录 |
+| AriaNg | `aria2ng` | 6880 | `nginx:alpine` + `p3terx/aria2-pro`（内置后端） | iframe 窗口 1280×860 | Web 端口、RPC 密钥、aria2 版本、下载目录、数据目录 |
+| Xunlei | `xunlei` | 2345 | `cnk3x/xunlei:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、Web 端口、下载目录、数据目录 |
+| Emby | `emby` | 8096（固定） | `amilys/embyserver:latest` | 新页签 | 镜像版本、网络模式、配置目录、媒体库目录 |
 | Music-DL | `music-dl` | 8099 | `guohuiyuan/go-music-dl:latest` | 新页签 | 网络模式、Web 端口、下载目录、数据目录 |
 | ReClip | `video-download-reclip` | 8899 | `reclipd/reclip:latest` | 新页签 | 网络模式、Web 端口、数据目录 |
 | MeTube | `metube` | 8081 | `ghcr.io/alexta69/metube:latest` | 新页签 | 网络模式、Web 端口、配置目录、下载目录 |
 | RustDesk Server | `rustdesk` | 21115–21120（固定） | `rustdesk/rustdesk-server:latest` | iframe 窗口 900×760 | 数据目录、中继地址、密钥、强制中继 |
 | Motrix | `motrix` | 8088、16801、6881 | `motrixapp/motrix-server:latest` | iframe 窗口 1280×860 | Web 端口、数据目录、下载目录、登录密码、对外地址 |
-| MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 网络模式、Web 端口、数据目录、媒体库、下载目录、管理员账号 |
+| MoviePilot | `moviepilot` | 3000 | `jxxghp/moviepilot-v2:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、Web 端口、数据目录、媒体库、下载目录、管理员账号 |
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
-| Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 网络模式、Web 端口、数据目录、加密密钥 |
-| Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 网络模式、Web 端口、数据目录 |
+| Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 镜像版本、网络模式、Web 端口、数据目录、加密密钥 |
+| Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
 
-**十一个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十二个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
+
+**六个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
+`moviepilot`、`nexterm`（latest / development）、`termix`（字段均为 `wizard_image_tag`）。
+选中的值直接拼进 compose 的 `image:` 行，装完想换通道就重装一次。
+其余应用的镜像上游只有 `latest` 一个通道（或 beta 标签早已停更），没有可选项。
 
 网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
 原因是给了会坏功能（BT 的 P2P、终端的 127.0.0.1、RustDesk 写死在客户端的端口）。
@@ -241,10 +247,13 @@ Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7
 
 路径都在安装向导里选，默认值与 fnOS 标准布局一致。
 
-`aria2ng` 是纯静态站点，**没有安装向导、也没有任何数据目录挂载**，所以不在下表内。
-
 | 应用 | 向导字段 | 默认值 | 容器内 |
 |---|---|---|---|
+| `aria2ng` | `wizard_data_dir` | `/vol1/1000/docker/aria2ng` | `/config`（aria2 的会话、DHT 与日志） |
+| `aria2ng` | `wizard_download_dir` | `/vol1/1000/downloads` | `/downloads` |
+| `aria2ng` | `wizard_rpc_secret` | `aria2ng` | aria2 RPC 密钥，nginx 与 aria2 共用，非挂载 |
+| `xunlei` | `wizard_download_dir` | `/vol1/1000/downloads` | `/xunlei/downloads` |
+| `xunlei` | `wizard_data_dir` | `/vol1/1000/docker/xunlei` | `/xunlei/data` |
 | `emby` | `wizard_data_dir` | `/vol1/1000/docker/emby` | `/config`（其下 `config` 子目录） |
 | `emby` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
 | `music-dl` | `wizard_download_dir` | `/vol1/1000/Download` | `/home/appuser/data/downloads` |
@@ -260,6 +269,9 @@ Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7
 | `moviepilot` | `wizard_media_dir` | `/vol1/1000/video` | `/media` |
 | `moviepilot` | `wizard_download_dir` | `/vol1/1000/Download` | `/downloads` |
 | `moviepilot` | `wizard_superuser` / `wizard_superuser_password` | `admin` / 无（必须自己设） | 超级管理员账号，非挂载 |
+| `termix` | `wizard_data_dir` | `/vol1/1000/docker/termix` | `/app/data` |
+| `nexterm` | `wizard_data_dir` | `/vol1/1000/docker/nexterm` | `/app/data` |
+| `nexterm` | `wizard_encryption_key` | 预填随机值 | 凭据加密密钥，非挂载，**确定后不可更换** |
 
 Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
 

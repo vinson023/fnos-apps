@@ -3,7 +3,8 @@ services:
     # 自托管服务器管理平台：SSH 终端、文件管理、隧道、远程桌面
     # 用 Docker Hub 上的 termixssh/termix，走飞牛的 registry mirror 加速；
     # 官方另一处 ghcr.io/termix-ssh/termix 是同一镜像，但 ghcr 不走加速会慢很多
-    image: termixssh/termix:latest
+    # 版本标签由安装向导决定（latest / beta），见 wizard/install
+    image: termixssh/termix:${wizard_image_tag}
     container_name: termix
     # 异常退出或宿主机重启后自动拉起
     restart: always
