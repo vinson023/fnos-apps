@@ -1,0 +1,15 @@
+appname=omnibox
+version=1.0.0
+display_name=OmniBox
+desc=OmniBox 是自托管的多媒体聚合平台，把影视、电视直播、音乐、听书、短剧与网盘资源集中到一个网页里播放。
+source=thirdparty
+platform=all
+developer=vinson023
+publisher=vinson023
+maintainer=vinson023
+desktop_uidir=ui
+desktop_applaunchname=omnibox.main
+service_port=7023
+ctl_stop=true
+checkport=false
+distributor=vinson023

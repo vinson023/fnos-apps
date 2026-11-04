@@ -1,0 +1,20 @@
+services:
+  omnibox:
+    # 自托管多媒体聚合平台：影视 / 直播 / 音乐 / 听书 / 短剧 + 网盘资源
+    # 版本标签由安装向导决定（beta = v3.x 主线，latest = v2.x 稳定线），见 wizard/install
+    image: lampon/omnibox:${wizard_image_tag}
+    container_name: omnibox
+    # 异常退出或宿主机重启后自动拉起
+    restart: always
+    ports:
+      # 容器内固定监听 7023（镜像里写死，没有环境变量可改），
+      # 所以这里只把宿主机端口做成可选：前后端口号不同，这是本包唯一一个例外。
+      - "${wizard_web_port}:7023"
+    environment:
+      # 时区，影响直播节目单（EPG）与录制文件时间
+      - TZ=Asia/Shanghai
+    volumes:
+      # /app/data 里放 SQLite 数据库、爬虫脚本及其 node_modules、.pip_packages、
+      # 网盘授权令牌和缓存。镜像把 NODE_PATH / PYTHONPATH 都指向这里，
+      # 所以这个目录必须持久化，否则重建容器等于全新安装。
+      - ${wizard_data_dir}:/app/data

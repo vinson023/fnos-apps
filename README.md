@@ -31,17 +31,20 @@
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
 | Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 镜像版本、网络模式、Web 端口、数据目录、加密密钥 |
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
+| OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | iframe 窗口 1280×860 | 镜像版本、访问端口、数据目录 |
 
-**十二个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十三个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
-**六个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
-`moviepilot`、`nexterm`（latest / development）、`termix`（字段均为 `wizard_image_tag`）。
-选中的值直接拼进 compose 的 `image:` 行，装完想换通道就重装一次。
+**七个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
+`moviepilot`、`nexterm`（latest / development）、`termix`、`omnibox`（latest / beta，字段均为
+`wizard_image_tag`）。选中的值直接拼进 compose 的 `image:` 行，装完想换通道就重装一次。
 其余应用的镜像上游只有 `latest` 一个通道（或 beta 标签早已停更），没有可选项。
 
 网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
 原因是给了会坏功能（BT 的 P2P、终端的 127.0.0.1、RustDesk 写死在客户端的端口）。
+反过来 `omnibox` 是**故意只给 bridge**：镜像把监听端口 7023 写死在二进制里（`PORT` 环境变量无效），
+host 模式下就没法换端口了，所以改用桥接 + `"${wizard_web_port}:7023"`，宿主端口照样可选。
 
 ## 仓库结构
 
@@ -61,7 +64,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（十一个应用全都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十三个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -272,6 +275,7 @@ Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7
 | `termix` | `wizard_data_dir` | `/vol1/1000/docker/termix` | `/app/data` |
 | `nexterm` | `wizard_data_dir` | `/vol1/1000/docker/nexterm` | `/app/data` |
 | `nexterm` | `wizard_encryption_key` | 预填随机值 | 凭据加密密钥，非挂载，**确定后不可更换** |
+| `omnibox` | `wizard_data_dir` | `/vol1/1000/docker/omnibox` | `/app/data`（`data.sqlite` + `subscriptions/`） |
 
 Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
 
@@ -609,6 +613,29 @@ device-code 远程配对。
 
    安全上必须清楚：**WeTTY 把认证完全交给 ssh，谁能访问 3002，谁就能看到密码提示并尝试登录**。
    不要把 3002 直接映射到公网；要外网用请走 VPN，或自己加一层带认证的反向代理。
+
+## OmniBox 的四个注意点
+
+1. **镜像端口写死 7023，改不了**。二进制里硬编码 `:7023`，`PORT` 环境变量无效
+   （实测 `-e PORT=8099` 仍然监听 7023），启动日志里是 `服务器启动 address=:7023`。
+   所以本包**只提供 bridge 模式**，用 `"${wizard_web_port}:7023"` 把宿主端口做成可选——
+   host 模式下没有端口映射，就没法换端口了。这是全仓库唯一一个「前后端口号不同」的 compose。
+
+2. **`beta` 才是主线，`latest` 是旧版**。上游 v3 重写后一直挂着 beta 标签：
+   `beta` = v3.2.1-beta.1（2026-10），`latest` = v2.x（2026-05，四个月没动）。
+   这里「最新」和「稳定」是两条版本线，不是一个版本的两个阶段，数据格式也不兼容，
+   换通道请当作全新安装。向导默认选 `beta`，和作者的实际发布节奏一致。
+
+3. **数据全在 `/app/data`**：`data.sqlite`（SQLite）、`subscriptions/`（爬虫脚本与
+   其 node_modules / .pip_packages）、网盘授权令牌、缓存。镜像把 `NODE_PATH`、`PYTHONPATH`
+   都指向 `/app/data/...`，所以这个目录**必须**持久化。实测首次启动会就地建库
+   （`data.sqlite` 落在 `/app/data` 里），不需要额外设 `DATABASE_URL`——
+   网上教程里那句 `DATABASE_URL: ./data.sqlite` 是相对 `/app` 的，照抄反而会把库放到卷外面。
+
+4. **应用本身不带任何片源**。装完首页是空的，要进 `/admin` 后台自己加：
+   影视 / 音乐 / 听书 / 短剧用「爬虫管理」从 GitHub 导入脚本，直播加直播源，网盘做授权。
+   首次打开会要求设置访问密码（就是这一个密码，没有账号体系）。
+   桌面用 iframe 打开（实测无 `X-Frame-Options`、无 CSP）。
 
 ## 关于第三方代码
 
