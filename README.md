@@ -661,6 +661,12 @@ device-code 远程配对。
 `apps/wetty/app/docker/wetty-shell.sh` 是仓库自己写的 8 行入口脚本（`exec ssh`），
 不来自上游；WeTTY 本体（`butlerx/wetty`，MIT）以官方镜像原样运行，仓库里不含其源码。
 
+`apps/omnibox/` 里的 `ICON.PNG` / `ICON_256.PNG` / `app/ui/images/icon_*.png`
+取自 OmniBox 自己的界面资源（镜像内 `/app/static/images/logo.png`，218×218 透明底），
+仅做了「居中缩放 + 加一层近白圆角底」的处理，图形本身未改动——
+用项目自己的标识比自绘图标更好认，也和桌面里点开的那个界面一致。
+OmniBox 本体以官方镜像原样运行，仓库里不含其源码；这个图标仅用于标识该应用。
+
 ## 脱敏说明
 
 本仓库由实际部署环境整理而来，发布前已做以下处理：
