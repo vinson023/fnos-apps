@@ -31,7 +31,7 @@
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
 | Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 镜像版本、网络模式、Web 端口、数据目录、加密密钥 |
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
-| OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | iframe 窗口 1280×860 | 镜像版本、访问端口、数据目录 |
+| OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
 
 **十三个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
@@ -635,7 +635,9 @@ device-code 远程配对。
 4. **应用本身不带任何片源**。装完首页是空的，要进 `/admin` 后台自己加：
    影视 / 音乐 / 听书 / 短剧用「爬虫管理」从 GitHub 导入脚本，直播加直播源，网盘做授权。
    首次打开会要求设置访问密码（就是这一个密码，没有账号体系）。
-   桌面用 iframe 打开（实测无 `X-Frame-Options`、无 CSP）。
+   桌面用**新页签**打开（`type: url`）。它其实没有 `X-Frame-Options`、也没有 CSP，
+   技术上可以内嵌；这里按使用者偏好走新页签——OmniBox 的播放页、后台 `/admin`
+   在整页里用更顺手，桌面内的小窗口装不下播放器控制条。
 
 ## 关于第三方代码
 

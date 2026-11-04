@@ -3,12 +3,10 @@
         "omnibox.main": {
             "title": "OmniBox",
             "icon": "images/icon_{0}.png",
-            "type": "iframe",
+            "type": "url",
             "protocol": "",
             "port": "7023",
             "url": "/",
-            "width": 1280,
-            "height": 860,
             "allUsers": false
         }
     }
