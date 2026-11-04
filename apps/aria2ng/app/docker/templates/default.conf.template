@@ -1,14 +1,10 @@
 # nginx 配置模板：容器启动时由官方 entrypoint 里的 envsubst 生成
 # /etc/nginx/conf.d/default.conf。
 #
-# 只有 ${WEB_PORT} 会被替换（compose 里设了 NGINX_ENVSUBST_FILTER=WEB_PORT），
-# 下面那些 $uri / $host 之类的 nginx 变量原样保留 —— 不设 filter 的话
-# envsubst 会把它们全部替换成空字符串，站点直接废掉。
-#
-# 端口用同一个变量同时决定「容器内监听端口」和「宿主机映射端口」：
-#   host 模式：nginx 直接监听 ${WEB_PORT}，ports 被 Docker 忽略（只警告）
-#   bridge 模式：nginx 监听 ${WEB_PORT}，ports 把 ${WEB_PORT} 映射到同一个号
-# 两种模式下对外都是同一个端口号，用户不用关心自己选的是哪种网络。
+# 只有 ${WEB_PORT} 和 ${RPC_SECRET} 会被替换（compose 里设了
+# NGINX_ENVSUBST_FILTER=WEB_PORT|RPC_SECRET），下面那些 $uri / $host /
+# $remote_addr 之类的 nginx 变量原样保留 —— 不设 filter 的话 envsubst
+# 会把它们全部替换成空字符串，站点直接废掉。
 server {
     listen ${WEB_PORT};
     listen [::]:${WEB_PORT};
@@ -17,6 +13,46 @@ server {
     root /usr/share/nginx/html;
     index index.html;
     charset utf-8;
+
+    # ------------------------------------------------------------------
+    # aria2 RPC 反向代理
+    #
+    # 前端不直接连 6800，而是访问本站的 /jsonrpc，由 nginx 转给容器内的
+    # aria2。好处是「同源」：
+    #   1. 没有跨域问题，不需要 aria2 的 rpc-allow-origin-all
+    #   2. 绕开 Chrome 的 Private Network Access —— 从公网域名页面访问
+    #      内网地址会被浏览器拦掉，同源请求不受此限制
+    #   3. 内网 IP、外网域名共用同一份配置，用户不用改任何东西
+    # ------------------------------------------------------------------
+    location = /jsonrpc {
+        proxy_pass http://127.0.0.1:6800/jsonrpc;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # 添加 BT 任务时 body 里带 base64 的种子，给足空间
+        client_max_body_size 20m;
+        # 大种子解析、批量查询可能慢，别让 nginx 提前掐断
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_connect_timeout 10s;
+        # RPC 响应绝不能缓存，否则界面上的进度会卡住不动
+        add_header Cache-Control "no-store";
+    }
+
+    # ------------------------------------------------------------------
+    # 前端 RPC 配置：动态生成，不落盘
+    #
+    # host / port / protocol 全部取浏览器当前地址，所以内网用 IP、外网用
+    # 域名都自动同源；secret 由安装向导决定，envsubst 注入。
+    # 用 nginx 直接 return 而不是写文件，是为了让只读的 html 目录保持干净。
+    # ------------------------------------------------------------------
+    location = /rpc-config.js {
+        default_type application/javascript;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        expires -1;
+        return 200 'window.ARIA2NG_RPC = {host: location.hostname, port: location.port || "80", interface: "jsonrpc", protocol: location.protocol.replace(":", ""), secret: "${RPC_SECRET}"};';
+    }
 
     # 静态资源与语言文件都不缓存：升级 fpk 后刷新即生效，
     # 不会被浏览器或 webview 里的旧文件卡住
@@ -29,15 +65,6 @@ server {
     # 不能落到下面的 try_files 兜底上——那样会把 index.html 当语言文件返回，
     # AriaNg 解析失败后整站退回英文。
     location /langs/ {
-        try_files $uri =404;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-        expires -1;
-    }
-
-    # 服务端配置（RPC 地址/端口/密钥）绝不能缓存：改完刷新就要生效。
-    # 缺失时必须老实 404——被下面的 try_files 兜底成 index.html 的话，
-    # 浏览器会拿一段 HTML 当 JS 执行，配置静默失效。
-    location = /rpc-config.js {
         try_files $uri =404;
         add_header Cache-Control "no-cache, no-store, must-revalidate";
         expires -1;

@@ -1,39 +1,71 @@
 services:
   aria2ng:
-    # 纯静态站点，不需要 PHP/Node 等运行时，nginx:alpine 体积最小
+    # AriaNg 前端（纯静态站点）+ 反向代理到内置的 aria2
     image: nginx:alpine
     container_name: aria2ng
-    # 异常退出或宿主机重启后自动拉起
     restart: always
-    # 网络模式由安装向导决定（host / bridge），见 wizard/install。
-    # host：直接占用宿主机端口，不做 NAT，性能最好，也天然同时吃 IPv4/IPv6。
-    # bridge：容器隔离，端口通过下面的 ports 映射出去。
-    network_mode: ${wizard_network_mode}
-    ports:
-      # host 模式下 Docker 会忽略这两行（只打印一条 warning），
-      # bridge 模式下生效。前后端口号相同，所以两种模式对外是同一个端口。
-      - "${wizard_web_port}:${wizard_web_port}"
+    # 固定 host 网络：内置的 aria2 需要真实 BT 端口（6888 TCP/UDP），
+    # bridge 下要额外映射、DHT 的 UDP 打洞也会变差；而且 host 下
+    # nginx 直接用 127.0.0.1:6800 反代，不依赖容器 DNS，最稳
+    network_mode: host
     environment:
       # 时区，影响日志时间
       - TZ=Asia/Shanghai
-      # nginx 的监听端口 = 用户在向导里选的端口。
-      # 模板里的 ${WEB_PORT} 由它替换，这样 host/bridge 两种模式监听同一个号。
+      # nginx 监听端口 = 用户在向导里选的端口
       - WEB_PORT=${wizard_web_port}
-      # 限定 envsubst 只替换 WEB_PORT，否则 nginx 配置里的 $uri / $host
-      # 也会被替换成空字符串，整个站点会 404。
-      - NGINX_ENVSUBST_FILTER=WEB_PORT
+      # aria2 的 RPC 密钥，由 /rpc-config.js 自动注入到前端，用户不用手填
+      - RPC_SECRET=${wizard_rpc_secret}
+      # 只替换这两个变量。不设 filter 的话 envsubst 会把 nginx 配置里的
+      # $uri / $host / $remote_addr 全部替换成空字符串，站点直接废掉
+      - NGINX_ENVSUBST_FILTER=WEB_PORT|RPC_SECRET
     volumes:
       # AriaNg 静态站随包分发，不依赖宿主机外部目录。
       # ${TRIM_APPDEST} 是 fnOS 注入的安装路径，实际为 /vol1/@appcenter/aria2ng
       - ${TRIM_APPDEST}/docker/html:/usr/share/nginx/html:ro
       # 站点配置模板：镜像启动时由 entrypoint 里的 envsubst 渲染到
       # /etc/nginx/conf.d/default.conf。这里挂目录而不是挂单个文件，
-      # 因为渲染产物必须落在容器内可写层，不能被只读挂载顶掉。
+      # 因为渲染产物必须落在容器内可写层，不能被只读挂载顶掉
       - ${TRIM_APPDEST}/docker/templates:/etc/nginx/templates:ro
       # 跟随宿主机时区
       - /etc/localtime:/etc/localtime:ro
-    # 纯静态文件托管，128MB 绰绰有余
+    # 确保 aria2 先起来，nginx 启动时反代目标已经存在
+    depends_on:
+      - aria2
+    # 纯静态 + 反代，128MB 够用
     mem_limit: 128m
     security_opt:
       # 禁止容器内进程通过 setuid/setgid 提权
       - no-new-privileges:true
+
+  aria2:
+    # Aria2 Pro：开箱即用的 aria2 镜像，BT/磁力/HTTP/FTP 全支持，
+    # 自动更新 tracker、限速重试、任务持久化。向导里可选 latest 或 test
+    image: p3terx/aria2-pro:${wizard_aria2_tag}
+    container_name: aria2
+    restart: always
+    # 同样用 host：BT/DHT 需要真实的 6888 端口，反代也走 127.0.0.1
+    network_mode: host
+    environment:
+      # 下载文件的属主，1000 = admin，保证在文件管理里能直接改名、移动、删除
+      - PUID=1000
+      - PGID=1000
+      - UMASK_SET=022
+      # RPC 密钥，与前端注入的是同一个值
+      - RPC_SECRET=${wizard_rpc_secret}
+      # RPC 端口。前端的反代写死了 6800，这里不要改
+      - RPC_PORT=6800
+      # BT/DHT 监听端口（TCP + UDP）
+      - LISTEN_PORT=6888
+      # 磁盘缓存，降低小文件下载时的磁盘 IO
+      - DISK_CACHE=64M
+      # 不开 IPv6：外网是「域名 → 路由器 → NAS IPv4」，容器内不需要 v6
+      - IPV6_MODE=false
+      # 自动从 trackerslist 拉取 BT tracker，提高冷门资源速度
+      - UPDATE_TRACKERS=true
+      - TZ=Asia/Shanghai
+    volumes:
+      # aria2.conf、aria2.session（任务进度）、dht.dat 都在这里。
+      # 丢了等于所有任务进度清零
+      - ${wizard_data_dir}:/config
+      # 下载目录
+      - ${wizard_download_dir}:/downloads

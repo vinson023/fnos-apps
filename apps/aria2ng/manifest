@@ -1,7 +1,7 @@
 appname=aria2ng
-version=1.0.6
+version=1.1.0
 display_name=AriaNg
-desc=AriaNg 是 aria2 的纯静态 Web 前端。装完打开页面，在设置里填 aria2 的 RPC 地址与密钥即可使用，不依赖任何后端服务。
+desc=AriaNg 是 aria2 的 Web 前端，本版本内置 Aria2 Pro 后端：装完打开页面即可添加 HTTP/BT/磁力任务，无需另外部署 aria2，也不用填 RPC 地址和密钥。
 source=thirdparty
 platform=all
 developer=vinson023
