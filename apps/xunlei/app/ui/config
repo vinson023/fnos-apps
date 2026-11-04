@@ -1,0 +1,13 @@
+{
+    ".url": {
+        "xunlei.main": {
+            "title": "迅雷",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "2345",
+            "url": "/",
+            "allUsers": false
+        }
+    }
+}

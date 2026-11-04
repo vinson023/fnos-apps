@@ -1,0 +1,50 @@
+services:
+  xunlei:
+    # 迅雷远程下载（从群晖套件提取的容器化版本，非官方）
+    # 镜像标签由安装向导决定：latest（v3.20.2，SPK 内嵌）或 beta（4.0.0，运行时下载 SPK）
+    image: cnk3x/xunlei:${wizard_image_tag}
+    container_name: xunlei
+    restart: always
+    # 迅雷 App 里显示的设备名，与宿主机名无关
+    hostname: fnos-xunlei
+    # 网络模式由安装向导决定（host / bridge）
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 忽略这两行（只打印 warning），bridge 模式下生效。
+      # 前后端口相同，两种模式对外是同一个号
+      - "${wizard_web_port}:${wizard_web_port}"
+    # 必需：迅雷要在 chroot 环境里做 mount / symlink，只给 SYS_ADMIN 会报
+    # "mount: permission denied" 然后容器直接退出，必须给完整特权
+    privileged: true
+    # 启动前把挂载目录的属主改成迅雷进程的 uid，否则目录归 root 所有、
+    # 迅雷以 uid 1000 运行时写不进去。
+    # 可执行文件路径两个版本不同：latest 在 /bin/xlp，beta 是 busybox 基础镜像、
+    # 在 /xlp。这里显式探测，两个版本都能起。
+    # 不能用 exec "$@" 透传镜像 CMD —— compose 一旦写了 entrypoint，镜像的 CMD
+    # 会被清成 null，$@ 为空会让 sh 直接退出（容器无限重启、日志全空）。
+    entrypoint:
+      - /bin/sh
+      - -c
+      - 'chown -R 1000:1000 /xunlei/data /xunlei/downloads 2>/dev/null; chmod -R u+rwX /xunlei/data /xunlei/downloads 2>/dev/null; if [ -x /bin/xlp ]; then exec /bin/xlp; else exec /xlp; fi'
+      - sh
+    environment:
+      - TZ=Asia/Shanghai
+      # 面板端口 = 用户在向导里选的端口，和 ports 用同一个变量
+      - XL_DASHBOARD_PORT=${wizard_web_port}
+      # 下载目录。容器内路径固定，宿主机路径由向导决定
+      - XL_DIR_DOWNLOAD=/xunlei/downloads
+      # 登录态、下载进度、插件都在这里，丢了等于要重新登录并丢任务
+      - XL_DIR_DATA=/xunlei/data
+      # 迅雷进程以 uid/gid 1000 运行，下载出来的文件归 admin 所有，
+      # 之后在飞牛文件管理里能直接改名、移动、删除
+      - XL_UID=1000
+      - XL_GID=1000
+    volumes:
+      - ${wizard_download_dir}:/xunlei/downloads
+      - ${wizard_data_dir}:/xunlei/data
+    # 说明：
+    # 1) 不挂 /xunlei/var/packages/pan-xunlei-com（SPK 解压目录）。
+    #    飞牛存储池是 ext4 + trimacl，容器内解压出来的文件权限会变成 000，
+    #    导致 launcher 无法执行、容器秒退。放在容器内层 overlay 就正常。
+    #    代价是重建容器时会重新下载一次 SPK（实测 3 秒），可以接受。
+    # 2) 不需要 IPv6 边车：外网是「域名 → 路由器 → 转发到本机 IPv4:端口」。
