@@ -54,15 +54,15 @@
                 "type": "password",
                 "field": "wizard_admin_password",
                 "label": "管理员密码",
-                "description": "首次启动时写入管理端，用户名固定 admin（之后可在「设置 → 管理用户」里改）。不填的话程序会自己随机生成一个并打印在容器日志里，但那样你还得去 NAS 上翻日志——所以这里直接设掉更省事。至少 10 位。",
+                "description": "首次启动时写入管理端，用户名固定 admin（之后可在「设置 → 管理用户」里改）。<br><br>⚠️ <b>必须满足程序自己的密码策略，否则容器会直接起不来</b>：至少 <b>12 位</b>；不能是 <code>admin123456789</code>、<code>password1234</code>、<code>qwertyuiop123</code>、<code>workbuddy2024</code> 这类常见弱口令；不能是「admin + 纯数字」；不能全是数字；不能是同一个字符重复。<br><br>不填的话程序会随机生成一个并打印在容器日志里，但那样你还得去 NAS 上翻日志——这里直接设掉更省事。",
                 "rules": [
                     {
                         "required": true,
                         "message": "请填写管理员密码"
                     },
                     {
-                        "min": 10,
-                        "message": "密码至少 10 位"
+                        "min": 12,
+                        "message": "密码至少 12 位（程序侧硬性要求，短了容器起不来）"
                     },
                     {
                         "max": 64,

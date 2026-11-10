@@ -1,5 +1,5 @@
 appname=workbuddy
-version=1.0.0
+version=1.0.1
 display_name=WorkBuddy 管理器
 desc=WorkBuddy Manager：腾讯 CodeBuddy 账号池的 Web 管理控制台，内置 OpenAI 兼容反代网关，支持扫码纳管、定时签到保活、密钥分发与用量审计。
 source=thirdparty
