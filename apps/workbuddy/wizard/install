@@ -1,0 +1,92 @@
+[
+    {
+        "stepTitle": "部署说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "WorkBuddy Manager 是腾讯 CodeBuddy 账号池的 <b>Web 管理控制台</b>，同时内置一个 OpenAI 兼容的反代网关。它解决的是「只有命令行、没有界面」的问题：原本要跑脚本扫码加号、用 <code>curl</code> 看状态，现在都在网页里点。<br><br><b>它由两个容器组成</b>，装完会自动一起起来：<br>· <code>workbuddy2api</code> —— 上游账号池与反代（Go），监听 7863，<b>只在内部网络，不对外</b><br>· <code>workbuddy-manager</code> —— 管理面板（Python/FastAPI），对外端口 <b>7864</b>，同时提供 <code>/v1</code> 给下游客户端<br><br><b>装完怎么用</b>：桌面图标 → 用 <code>admin</code> + 下一步设的密码登录 → 「账号」页点「添加账号」，微信/QQ 扫码授权 → 「密钥」页签发密钥 → 把下游客户端指向 <code>http://NAS地址:7864/v1</code>。<b>它本身不带任何账号</b>，首次登录时列表一定是空的。<br><br>⚠️ <b>安全提醒（请认真看）</b>：这个面板持有<b>全部账号凭据</b>和网关密钥，是典型的高价值目标。官方明确要求「只监听本机 + 反向代理加 HTTPS」，本包为了桌面图标可用默认监听所有网卡。请至少做到：<b>不要把它直接映射到公网</b>；外网访问走带 HTTPS 的反向代理，或只在内网/VPN 里用。<br><br>⚠️ <b>关于升级</b>：面板自带的「一键更新」在容器部署下会把新代码写进容器可写层，<b>重建容器就退回镜像版本</b>，两套机制会打架。本包的升级方式是<b>重装 fpk</b>（或 <code>docker compose pull</code> 后重建），数据目录不受影响。<br><br>📌 使用边界：本项目只用于管理<b>你本人及亲属自愿授权</b>的账号，禁止批量注册、账号交易、绕过平台风控与商业转售。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "版本与访问",
+        "items": [
+            {
+                "type": "radio",
+                "field": "wizard_image_version",
+                "label": "镜像版本",
+                "initValue": "latest",
+                "description": "两个容器用的是同一套版本号（上游和管理端同版本发布），这里一个选项同时决定两个镜像的标签。latest = 跟随最新发布，重建容器就升到新版；2.11.12 = 钉死版本，可复现、不会被意外升级。上游没有 beta 通道，所以这里只有这两种选法。",
+                "options": [
+                    {
+                        "label": "latest —— 跟随最新发布（推荐）",
+                        "value": "latest"
+                    },
+                    {
+                        "label": "2.11.12 —— 钉死版本，不被意外升级",
+                        "value": "2.11.12"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_web_port",
+                "label": "访问端口",
+                "initValue": "7864",
+                "description": "管理面板和 /v1 网关共用的端口，默认 7864（和容器内一致）。镜像把容器内端口写死成 7864，改不了，所以这里改的只是宿主机端口。注意：改了端口后飞牛桌面图标仍指向 7864，需要手动访问新端口；下游客户端也要跟着改。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写端口"
+                    },
+                    {
+                        "pattern": "^[0-9]{2,5}$",
+                        "message": "端口只能是数字，范围 1-65535"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "stepTitle": "管理员密码与数据目录",
+        "items": [
+            {
+                "type": "password",
+                "field": "wizard_admin_password",
+                "label": "管理员密码",
+                "description": "首次启动时写入管理端，用户名固定 admin（之后可在「设置 → 管理用户」里改）。不填的话程序会自己随机生成一个并打印在容器日志里，但那样你还得去 NAS 上翻日志——所以这里直接设掉更省事。至少 10 位。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写管理员密码"
+                    },
+                    {
+                        "min": 10,
+                        "message": "密码至少 10 位"
+                    },
+                    {
+                        "max": 64,
+                        "message": "密码最多 64 位"
+                    }
+                ]
+            },
+            {
+                "type": "text",
+                "field": "wizard_data_dir",
+                "label": "数据目录",
+                "initValue": "/vol1/1000/docker/workbuddy",
+                "description": "目录下会建两个子目录：<b>manager/</b>（SQLite 数据库、会话密钥、日志）和 <b>upstream/</b>（config.json 含上游随机密钥、auths/ 每个账号一个 JSON、state.json）。⚠️ 这个目录丢了等于丢掉全部已纳管账号（授权文件在里面，需要重新扫码），建议纳入备份。目录不存在会自动创建。",
+                "rules": [
+                    {
+                        "required": true,
+                        "message": "请填写数据目录"
+                    },
+                    {
+                        "pattern": "^/[A-Za-z0-9._/-]+$",
+                        "message": "必须是绝对路径，且只能包含字母、数字、点、下划线、短横线和斜杠"
+                    }
+                ]
+            }
+        ]
+    }
+]

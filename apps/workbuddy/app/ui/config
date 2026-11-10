@@ -1,0 +1,13 @@
+{
+    ".url": {
+        "workbuddy.main": {
+            "title": "WorkBuddy 管理器",
+            "icon": "images/icon_{0}.png",
+            "type": "url",
+            "protocol": "",
+            "port": "7864",
+            "url": "/",
+            "allUsers": false
+        }
+    }
+}

@@ -32,13 +32,16 @@
 | Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 镜像版本、网络模式、Web 端口、数据目录、加密密钥 |
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
 | OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
+| WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、访问端口、管理员密码、数据目录 |
 
-**十三个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十四个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 **七个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
 `moviepilot`、`nexterm`（latest / development）、`termix`、`omnibox`（latest / beta，字段均为
 `wizard_image_tag`）。选中的值直接拼进 compose 的 `image:` 行，装完想换通道就重装一次。
+`workbuddy` 也用同一个字段，但它的两个镜像**没有 beta 通道**，所以选项是 `latest` / `2.11.12`（钉版本），
+并且一个值同时决定上游与管理端两个镜像的标签——这两个项目是同版本号发布的。
 其余应用的镜像上游只有 `latest` 一个通道（或 beta 标签早已停更），没有可选项。
 
 网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
@@ -64,7 +67,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（十三个应用全都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十四个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -276,6 +279,9 @@ Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7
 | `nexterm` | `wizard_data_dir` | `/vol1/1000/docker/nexterm` | `/app/data` |
 | `nexterm` | `wizard_encryption_key` | 预填随机值 | 凭据加密密钥，非挂载，**确定后不可更换** |
 | `omnibox` | `wizard_data_dir` | `/vol1/1000/docker/omnibox` | `/app/data`（`data.sqlite` + `subscriptions/`） |
+| `workbuddy` | `wizard_data_dir` | `/vol1/1000/docker/workbuddy` | 拆成两个子目录，见下 |
+| `workbuddy` | `…/manager` | 自动创建 | `/app/data`：SQLite、`users.json`（会话密钥）、日志 |
+| `workbuddy` | `…/upstream` | 自动创建 | 同时挂到上游的 `/app/state` 与管理端的 `/opt/workbuddy2api` |
 
 Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
 
@@ -639,6 +645,42 @@ device-code 远程配对。
    技术上可以内嵌；这里按使用者偏好走新页签——OmniBox 的播放页、后台 `/admin`
    在整页里用更顺手，桌面内的小窗口装不下播放器控制条。
 
+## WorkBuddy 管理器的五个注意点
+
+1. **它是两个容器，不是一个**。上游 `workbuddy2api`（Go，账号池 + OpenAI 兼容反代）监听 7863，
+   **只在 compose 网络内，不发布端口**；管理端 `workbuddy-manager`（Python/FastAPI）对外 7864，
+   同时把 `/v1` 暴露给下游客户端。所以**下游要接的是 7864 的 `/v1`**，不是 7863——
+   管理端拿着网关密钥再转给上游。7863 一旦发布出去就等于多了一个可以绕过密钥白名单的入口。
+
+2. **两个容器都用 root 跑，这是故意的**。镜像默认以 uid `10001` 运行，而飞牛存储池是
+   `ext4 + trimacl`：`docker compose up` 建出来的宿主机目录属主是 root、mode 常常是 000，
+   uid 10001 写不进去。上游文档里对应的症状是 `sqlite3 … unable to open database file`
+   和「auths 里明明有文件、面板却显示 0 个账号」。
+   这类问题在 fpk 里没有干净的解法（`cmd/*` 以 package 用户身份运行，没权限跨 uid chown），
+   所以统一用 root，让两边看到同一份文件。代价是进程在容器内是 root，
+   本包没有再给它 `docker.sock` 或任何额外 capability。
+
+3. **`/app/state` 是数据目录，`config.json` 与上游 `api_key` 首次启动自动生成**。
+   上游镜像里 `config.json` 的 `api_key` 是占位值 `test_key`，`auth_dir` / `state_file`
+   是相对路径（`./auths`、`./data/state.json`）。所以 compose 把上游的 `working_dir`
+   指到挂载点 `/app/state`，entrypoint 首启时把镜像自带的 `config.json` 复制出来、
+   并把 `api_key` 换成 `/dev/urandom` 生成的随机串。管理端则通过固定路径
+   `WB_AUTH_DIR=/opt/workbuddy2api/auths`、`WB_UPSTREAM_CONFIG=/opt/workbuddy2api/config.json`
+   读写同一份文件——这也是为什么同一个宿主机目录要挂两次（上游挂 `/app/state`，管理端挂 `/opt/workbuddy2api`）。
+
+4. **故意不设 `WB_TRUST_PROXY`**。官方 compose 里写的是 `WB_TRUST_PROXY: "1"`，那是因为它假设
+   你前面有一层 nginx。本包的拓扑是「NAS 直连 + 路由器四层端口映射」，前面没有七层反代，
+   采信 `X-Real-IP` 只等于让客户端可以伪造来源 IP，会连带影响全局 IP 白/黑名单、登录失败锁定
+   和审计日志。以后真在前面加了 nginx / 1Panel，再把这个变量设成 `1`。
+
+5. **面板自带的「一键更新」和数据目录是两回事**。那个更新器会把新代码写进容器的可写层
+   （`/app/server`、`/app/web/out`），`docker restart` 还在，**一旦重建容器就退回镜像版本**；
+   它还会把新依赖装到 `/app/.local`，同样随容器消失。本包用镜像部署，所以升级走
+   **重装 fpk**（或 `docker compose pull && up -d`），别混着用。
+   另外两个镜像都在 `ghcr.io`，**不走飞牛的 Docker Hub 加速**：实测上游 36MB 约 15 秒、
+   管理端 148MB 约 9 秒（层可复用），比想象中快，但首次安装确实要等一会儿。
+   数据目录 `…/upstream/auths` 里是每个账号的授权文件，**删了就得重新扫码**，务必纳入备份。
+
 ## 关于第三方代码
 
 `apps/aria2ng/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) v1.2.3
@@ -662,6 +704,11 @@ device-code 远程配对。
 
 `apps/wetty/app/docker/wetty-shell.sh` 是仓库自己写的 8 行入口脚本（`exec ssh`），
 不来自上游；WeTTY 本体（`butlerx/wetty`，MIT）以官方镜像原样运行，仓库里不含其源码。
+
+`apps/workbuddy/` 里的图标取自管理端镜像自带的 PWA 图标
+（`/app/web/out/favicon/android-chrome-512x512.png`，512×512 透明底、自带圆角），
+只做了等比缩放到 256 / 64，图形未改动。两个服务端本体（`ithtelab/workbuddy-manager`、
+`ithtelab/workbuddy2api`）均以官方镜像原样运行，仓库里不含其源码。
 
 `apps/omnibox/` 里的 `ICON.PNG` / `ICON_256.PNG` / `app/ui/images/icon_*.png`
 取自 OmniBox 自己的界面资源（镜像内 `/app/static/images/logo.png`，218×218 透明底），

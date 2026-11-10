@@ -1,0 +1,82 @@
+services:
+  # ── 上游网关：账号池 + OpenAI 兼容反代（Go）──────────────────────────────
+  # 只在本 compose 网络内提供服务，不发布端口。下游客户端接的是管理端的 7864，
+  # 由管理端带着网关密钥再转给这里，所以 7863 没有任何对外的必要。
+  workbuddy2api:
+    image: ghcr.io/ithtelab/workbuddy2api:${wizard_image_version}
+    container_name: workbuddy2api
+    # 异常退出或宿主机重启后自动拉起。
+    # 注意：管理端的「一键更新」依赖进程退出后由 restart 策略拉新代码，
+    # 但那是「容器内改文件」的玩法；本包用镜像部署，重建容器就会回到镜像版本。
+    restart: unless-stopped
+    # 镜像默认以 uid 10001(app) 运行，但飞牛存储池是 ext4 + trimacl：
+    # 宿主机建出来的目录属主是 root、mode 常常是 000，uid 10001 写不进去
+    #（症状是 sqlite / auths 读写失败，或账号列表恒为 0 个）。
+    # 统一用 root，省掉装完后还要跨 uid chown 的步骤。
+    user: "0:0"
+    # 配置里的 auth_dir / state_file 都是相对路径（./auths、./data/state.json），
+    # 把工作目录指到挂载点，配置、账号、状态就都落在数据目录里
+    working_dir: /app/state
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /app/state/auths /app/state/data
+        if [ ! -s /app/state/config.json ]; then
+          # 首次启动：用镜像内置的默认配置打底。
+          # 镜像里 api_key 是占位值 test_key，换成随机串
+          #（7863 不对外，但默认密钥留着没有好处）
+          cp /app/config.json /app/state/config.json
+          KEY=$$(head -c 32 /dev/urandom | sha256sum | cut -c1-48)
+          sed -i "s/\"api_key\": *\"[^\"]*\"/\"api_key\": \"$$KEY\"/" /app/state/config.json
+        fi
+        exec /app/wb2api -config /app/state/config.json
+    environment:
+      # 时区，影响定时签到 / 保活任务的执行时刻
+      - TZ=Asia/Shanghai
+    # 不写 ports —— 只有同一网络的 workbuddy-manager 能连到 7863
+    expose:
+      - "7863"
+    volumes:
+      # config.json（含上游 api_key）、auths/（每账号一个 JSON）、data/state.json
+      - ${wizard_data_dir}/upstream:/app/state
+
+  # ── 管理端：Web 控制台 + 对外网关（Python/FastAPI）───────────────────────
+  workbuddy-manager:
+    image: ghcr.io/ithtelab/workbuddy-manager:${wizard_image_version}
+    container_name: workbuddy-manager
+    restart: unless-stopped
+    user: "0:0"
+    depends_on:
+      - workbuddy2api
+    ports:
+      # 容器内固定 7864（镜像 CMD 里写死 --port 7864），无法用环境变量改，
+      # 所以这里只把宿主机端口做成可选；默认 7864，前后一致。
+      - "${wizard_web_port}:7864"
+    environment:
+      # 首次启动写入的管理员密码（用户名固定 admin）。之后在「设置 → 管理用户」里改。
+      - WB_ADMIN_PASSWORD=${wizard_admin_password}
+      # 同一 compose 网络里用服务名，不走 host.docker.internal
+      - WB2API_BASE=http://workbuddy2api:7863
+      # 生产环境不暴露 Swagger（/docs 与 /openapi.json）
+      - WB_ENABLE_DOCS=0
+      # 不给 WB_TRUST_PROXY：本包是「NAS 直连 + 路由器四层端口映射」的拓扑，
+      # 前面没有 HTTP 反代，采信 X-Real-IP 等于让客户端可以伪造来源 IP，
+      # 会连带影响全局 IP 白/黑名单与登录失败锁定。
+      # 以后若在前面加了 nginx / 1Panel 之类的七层反代，再加 WB_TRUST_PROXY=1。
+    volumes:
+      # SQLite（manager.db）、users.json（含会话密钥）、更新状态
+      - ${wizard_data_dir}/manager:/app/data
+      # 管理端通过这两个固定路径读写上游：
+      #   WB_AUTH_DIR=/opt/workbuddy2api/auths
+      #   WB_UPSTREAM_CONFIG=/opt/workbuddy2api/config.json
+      # 所以把同一个数据目录再挂到 /opt/workbuddy2api，两边看到的是同一份文件
+      - ${wizard_data_dir}/upstream:/opt/workbuddy2api
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7864/api/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # 首启要建库、装默认用户，给足时间
+      start_period: 30s
