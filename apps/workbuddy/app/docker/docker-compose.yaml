@@ -1,7 +1,8 @@
 services:
   # ── 上游网关：账号池 + OpenAI 兼容反代（Go）──────────────────────────────
-  # 只在本 compose 网络内提供服务，不发布端口。下游客户端接的是管理端的 7864，
-  # 由管理端带着网关密钥再转给这里，所以 7863 没有任何对外的必要。
+  # 网络模式由安装向导决定（host / bridge）。管理端用 network_mode: "service:…"
+  # 跟它共用同一个网络命名空间，两个容器因此始终在同一个 netns 里，
+  # 管理端连上游可以固定用 127.0.0.1，两种模式都不用改地址。
   workbuddy2api:
     image: ghcr.io/ithtelab/workbuddy2api:${wizard_image_version}
     container_name: workbuddy2api
@@ -14,6 +15,12 @@ services:
     #（症状是 sqlite / auths 读写失败，或账号列表恒为 0 个）。
     # 统一用 root，省掉装完后还要跨 uid chown 的步骤。
     user: "0:0"
+    network_mode: ${wizard_network_mode}
+    ports:
+      # 端口要发布在「持有网络命名空间的那个服务」上 —— 也就是这里，
+      # 因为管理端用的是 network_mode: "service:workbuddy2api"。
+      # host 模式下 Docker 会忽略这段（只打印一条 warning），端口由进程直接监听。
+      - "${wizard_web_port}:${wizard_web_port}"
     # 配置里的 auth_dir / state_file 都是相对路径（./auths、./data/state.json），
     # 把工作目录指到挂载点，配置、账号、状态就都落在数据目录里
     working_dir: /app/state
@@ -26,7 +33,7 @@ services:
         if [ ! -s /app/state/config.json ]; then
           # 首次启动：用镜像内置的默认配置打底。
           # 镜像里 api_key 是占位值 test_key，换成随机串
-          #（7863 不对外，但默认密钥留着没有好处）
+          #（7863 不对外发布，但默认密钥留着没有好处）
           cp /app/config.json /app/state/config.json
           KEY=$$(head -c 32 /dev/urandom | sha256sum | cut -c1-48)
           sed -i "s/\"api_key\": *\"[^\"]*\"/\"api_key\": \"$$KEY\"/" /app/state/config.json
@@ -35,9 +42,6 @@ services:
     environment:
       # 时区，影响定时签到 / 保活任务的执行时刻
       - TZ=Asia/Shanghai
-    # 不写 ports —— 只有同一网络的 workbuddy-manager 能连到 7863
-    expose:
-      - "7863"
     volumes:
       # config.json（含上游 api_key）、auths/（每账号一个 JSON）、data/state.json
       - ${wizard_data_dir}/upstream:/app/state
@@ -50,18 +54,35 @@ services:
     user: "0:0"
     depends_on:
       - workbuddy2api
-    ports:
-      # 容器内固定 7864（镜像 CMD 里写死 --port 7864），无法用环境变量改，
-      # 所以这里只把宿主机端口做成可选；默认 7864，前后一致。
-      - "${wizard_web_port}:7864"
+    # 与上游共用一个 netns：这样 127.0.0.1:7863 在 host / bridge 两种模式下都成立，
+    # 既不用 host.docker.internal，也不用把 7863 映射到宿主机。
+    # 代价是端口必须发布在上面 workbuddy2api 的 ports 里（已处理）。
+    network_mode: "service:workbuddy2api"
+    # 镜像默认 CMD 把端口写死成 7864，这里覆盖成向导里选的端口 ——
+    # host 模式下没有端口映射，进程必须自己监听用户选的端口，
+    # 所以 CMD 和 WB_MANAGER_PORT 一起改，保持前后端口号一致。
+    command:
+      - python
+      - -m
+      - uvicorn
+      - server.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "${wizard_web_port}"
+      - --timeout-graceful-shutdown
+      - "20"
     environment:
-      # 首次启动写入的管理员密码（用户名固定 admin）。之后在「设置 → 管理用户」里改。
+      # 首次启动写入的管理员密码（用户名固定 admin，至少 12 位）。
+      # 之后在「设置 → 管理用户」里改。
       - WB_ADMIN_PASSWORD=${wizard_admin_password}
-      # 同一 compose 网络里用服务名，不走 host.docker.internal
-      - WB2API_BASE=http://workbuddy2api:7863
+      # 与上游同 netns，固定回环地址，两种网络模式通用
+      - WB2API_BASE=http://127.0.0.1:7863
+      # 和 --port 保持一致，避免界面里显示的端口和实际监听的对不上
+      - WB_MANAGER_PORT=${wizard_web_port}
       # 生产环境不暴露 Swagger（/docs 与 /openapi.json）
       - WB_ENABLE_DOCS=0
-      # 不给 WB_TRUST_PROXY：本包是「NAS 直连 + 路由器四层端口映射」的拓扑，
+      # 不给 WB_TRUST_PROXY：本包是「NAS 直连 + 路由器端口映射」的拓扑，
       # 前面没有 HTTP 反代，采信 X-Real-IP 等于让客户端可以伪造来源 IP，
       # 会连带影响全局 IP 白/黑名单与登录失败锁定。
       # 以后若在前面加了 nginx / 1Panel 之类的七层反代，再加 WB_TRUST_PROXY=1。
@@ -74,7 +95,7 @@ services:
       # 所以把同一个数据目录再挂到 /opt/workbuddy2api，两边看到的是同一份文件
       - ${wizard_data_dir}/upstream:/opt/workbuddy2api
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7864/api/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:${wizard_web_port}/api/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -32,7 +32,7 @@
 | Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 镜像版本、网络模式、Web 端口、数据目录、加密密钥 |
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
 | OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
-| WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、访问端口、管理员密码、数据目录 |
+| WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、网络模式、访问端口、管理员密码、数据目录 |
 
 **十四个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
@@ -648,9 +648,16 @@ device-code 远程配对。
 ## WorkBuddy 管理器的五个注意点
 
 1. **它是两个容器，不是一个**。上游 `workbuddy2api`（Go，账号池 + OpenAI 兼容反代）监听 7863，
-   **只在 compose 网络内，不发布端口**；管理端 `workbuddy-manager`（Python/FastAPI）对外 7864，
-   同时把 `/v1` 暴露给下游客户端。所以**下游要接的是 7864 的 `/v1`**，不是 7863——
-   管理端拿着网关密钥再转给上游。7863 一旦发布出去就等于多了一个可以绕过密钥白名单的入口。
+   管理端 `workbuddy-manager`（Python/FastAPI）对外 7864，同时把 `/v1` 暴露给下游客户端。
+   所以**下游要接的是 7864 的 `/v1`**，不是 7863——管理端拿着网关密钥再转给上游。
+   **7863 从不写进 `ports`**：bridge 模式下它只在容器网内；host 模式下它会跟着在宿主机上监听，
+   那种情况下**别把它一起映射到公网**。
+
+   网络模式由向导选（host / bridge），但**管理端不跟着切 `network_mode`，而是用
+   `network_mode: "service:workbuddy2api"` 和上游共用一个 netns**。这样 `WB2API_BASE`
+   可以固定写 `http://127.0.0.1:7863`，两种模式都对——否则 bridge 下要写服务名、
+   host 下要写回环地址，而 compose 做不了条件分支。代价是一条容易踩到的规则：
+   **端口必须发布在持有 netns 的那个服务（`workbuddy2api`）上**，写在管理端上是无效的。
 
 2. **两个容器都用 root 跑，这是故意的**。镜像默认以 uid `10001` 运行，而飞牛存储池是
    `ext4 + trimacl`：`docker compose up` 建出来的宿主机目录属主是 root、mode 常常是 000，
@@ -667,6 +674,9 @@ device-code 远程配对。
    并把 `api_key` 换成 `/dev/urandom` 生成的随机串。管理端则通过固定路径
    `WB_AUTH_DIR=/opt/workbuddy2api/auths`、`WB_UPSTREAM_CONFIG=/opt/workbuddy2api/config.json`
    读写同一份文件——这也是为什么同一个宿主机目录要挂两次（上游挂 `/app/state`，管理端挂 `/opt/workbuddy2api`）。
+   端口同理：镜像 CMD 把 `--port 7864` 写死了，**compose 覆盖 `command` 并同步改
+   `WB_MANAGER_PORT`**，用户选的端口才在两种网络模式下都成立（host 模式没有端口映射，
+   进程必须自己监听那个号）。实测改成 7865 后 `ss` 里只有 7865、登录页 200。
 
 4. **故意不设 `WB_TRUST_PROXY`**。官方 compose 里写的是 `WB_TRUST_PROXY: "1"`，那是因为它假设
    你前面有一层 nginx。本包的拓扑是「NAS 直连 + 路由器四层端口映射」，前面没有七层反代，
