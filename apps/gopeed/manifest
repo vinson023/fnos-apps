@@ -1,5 +1,5 @@
 appname=gopeed
-version = 1.0.5
+version = 1.0.6
 display_name=Gopeed
 desc=Gopeed 是 Go 写的现代下载器：HTTP/HTTPS、BitTorrent、磁力与 ed2k 一把梭，自带 Web 界面、REST API 和浏览器扩展。
 source=thirdparty

@@ -11,7 +11,7 @@ services:
     network_mode: ${wizard_network_mode}
     ports:
       # host 模式下 Docker 会忽略这行（只打印一条 warning），端口由进程直接监听
-      - "${wizard_web_port}:${wizard_web_port}"
+      - "6882:6882"
     entrypoint:
       - /bin/sh
       - -c
@@ -33,7 +33,7 @@ services:
       - UMASK=022
       # 监听端口 = 用户填的端口。GOPEED_ 前缀的环境变量直接映射成配置项，
       # 所以两种网络模式下端口都是真正可改的（实测 18888 生效）
-      - GOPEED_PORT=${wizard_web_port}
+      - GOPEED_PORT=6882
       # Web 界面账号密码。密码一旦设置就会启用登录，不设就是裸奔 ——
       # gopeed 官方文档明确说暴露在公网必须开认证
       - GOPEED_USERNAME=${wizard_username}
@@ -45,23 +45,3 @@ services:
       # 数据目录：gopeed.db（SQLite，任务记录 + 全部设置）、logs/
       - ${wizard_data_dir}:/app/storage
 
-  gopeed-fwd:
-    # 桌面图标的兜底入口。飞牛把图标地址写死成包里 ui/config 的 port（38099），
-    # 不认向导里填的端口，也没有脚本能在安装时改到那条记录（四条路都实测堵死）。
-    # 所以在这里监听 38099，转发到用户真正的端口 —— 谁装都不用管数据库。
-    image: alpine/socat:latest
-    container_name: gopeed-fwd
-    restart: unless-stopped
-    # host 网络：bridge 模式宿主机已映射用户端口，host 模式进程直接监听，
-    # 两种情况 127.0.0.1:<用户端口> 都通
-    network_mode: host
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        if [ "${wizard_web_port}" = "38099" ]; then
-          echo "[gopeed-fwd] 端口即图标端口 38099，无需转发"
-          exec sleep infinity
-        fi
-        echo "[gopeed-fwd] 图标 38099 -> 127.0.0.1:${wizard_web_port}"
-        exec socat TCP-LISTEN:38099,fork,reuseaddr TCP:127.0.0.1:${wizard_web_port}
