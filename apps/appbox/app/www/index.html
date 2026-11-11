@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>容器商店</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 20px 40px; font-family: -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif; font-size: 14px; color: #1f2329; background: #f7f8fa;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: #6b7280; font-size: 12px; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .row { display: flex; gap: 8px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px;
+    font-size: 13px; font-family: inherit; background: #fff; color: #1f2329;
+  }
+  textarea { resize: vertical; min-height: 64px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  button {
+    padding: 8px 14px; border: 1px solid #2563eb; background: #2563eb; color: #fff;
+    border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  button.ghost { background: #fff; color: #2563eb; }
+  button.danger { background: #fff; color: #b91c1c; border-color: #fca5a5; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .results { margin-top: 12px; display: grid; gap: 6px; }
+  .item {
+    padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 8px; cursor: pointer;
+    display: flex; justify-content: space-between; gap: 12px; align-items: center;
+  }
+  .item:hover { border-color: #2563eb; background: #f8faff; }
+  .item.active { border-color: #2563eb; background: #eff6ff; }
+  .item .name { font-weight: 500; }
+  .item .desc { color: #6b7280; font-size: 12px; margin-top: 2px; }
+  .badge { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+  .meta { color: #9ca3af; font-size: 12px; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  label { display: block; font-size: 12px; color: #4b5563; margin-bottom: 4px; }
+  .hint { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+  .icon-pick { display: flex; align-items: center; gap: 12px; }
+  .icon-preview {
+    width: 56px; height: 56px; border-radius: 12px; border: 1px dashed #d1d5db;
+    background: #f9fafb center/cover no-repeat; flex: 0 0 auto;
+  }
+  .log {
+    margin-top: 12px; background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 10px 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap;
+    max-height: 220px; overflow: auto; display: none;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #f1f2f4; font-size: 13px; }
+  th { color: #6b7280; font-weight: 500; font-size: 12px; }
+  .state-ok { color: #047857; }
+  .state-bad { color: #b91c1c; }
+  .empty { color: #9ca3af; font-size: 13px; padding: 8px 0; }
+  a { color: #2563eb; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1>容器商店</h1>
+<div class="sub">搜索 Docker 镜像 → 生成 compose → 起容器 → 加一个桌面图标。只管理自己创建的容器（前缀 <code>appbox-</code>）。</div>
+
+<div class="card">
+  <h2>1 选镜像</h2>
+  <div class="row">
+    <input id="q" type="text" placeholder="搜索镜像，例如 jellyfin / qbittorrent / uptime-kuma">
+    <button id="btnSearch">搜索</button>
+  </div>
+  <div id="results" class="results"></div>
+</div>
+
+<div class="card" id="cfgCard" style="display:none">
+  <h2>2 配置并部署 <span id="pickedName" class="meta"></span></h2>
+
+  <div class="grid3">
+    <div>
+      <label>镜像</label>
+      <input id="image" type="text" readonly>
+    </div>
+    <div>
+      <label>标签</label>
+      <select id="tag"></select>
+    </div>
+    <div>
+      <label>显示名称</label>
+      <input id="title" type="text" placeholder="桌面图标上的名字">
+    </div>
+  </div>
+
+  <div class="grid3" style="margin-top:12px">
+    <div>
+      <label>容器内端口</label>
+      <input id="containerPort" type="number" placeholder="80">
+    </div>
+    <div>
+      <label>宿主机端口</label>
+      <input id="hostPort" type="number" placeholder="例如 18080">
+    </div>
+    <div>
+      <label>标识（容器名后缀）</label>
+      <input id="slug" type="text" placeholder="自动生成">
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <button class="ghost" id="btnInspect">读取镜像信息（拉取后自动填端口）</button>
+    <span id="inspectHint" class="hint"></span>
+  </div>
+
+  <div class="grid" style="margin-top:12px">
+    <div>
+      <label>环境变量（每行一个 KEY=VALUE）</label>
+      <textarea id="env" placeholder="TZ=Asia/Shanghai"></textarea>
+    </div>
+    <div>
+      <label>目录挂载（每行一个 宿主路径:容器路径）</label>
+      <textarea id="volumes" placeholder="/vol1/1000/docker/myapp:/config"></textarea>
+    </div>
+  </div>
+
+  <div style="margin-top:12px">
+    <label>桌面图标（可选，建议 256×256 的 PNG；上传后才会加桌面图标）</label>
+    <div class="icon-pick">
+      <div class="icon-preview" id="iconPreview"></div>
+      <input id="icon" type="file" accept="image/*">
+    </div>
+  </div>
+
+  <div style="margin-top:16px">
+    <button id="btnDeploy">开始部署</button>
+    <span class="hint">会先拉镜像（可能几分钟），然后生成 compose 并启动。</span>
+  </div>
+  <div class="log" id="log"></div>
+</div>
+
+<div class="card">
+  <h2>已部署 <button class="ghost" id="btnRefresh" style="margin-left:auto;padding:4px 10px">刷新</button></h2>
+  <div id="apps"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let picked = null, iconData = null;
+
+function fmtSize(n) { return n ? (n / 1048576).toFixed(0) + ' MB' : '—'; }
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+$('btnSearch').onclick = async () => {
+  const q = $('q').value.trim();
+  if (!q) return;
+  $('results').innerHTML = '<div class="empty">搜索中…</div>';
+  const data = await api('/api/search?q=' + encodeURIComponent(q));
+  const list = data.results || [];
+  if (!list.length) { $('results').innerHTML = '<div class="empty">没有结果</div>'; return; }
+  $('results').innerHTML = list.map(it => `
+    <div class="item" data-image="${it.image}" data-name="${it.name}">
+      <div>
+        <div class="name">${it.image} ${it.official ? '<span class="badge">官方</span>' : ''}</div>
+        <div class="desc">${it.description || ''}</div>
+      </div>
+      <div class="meta">★ ${it.stars}</div>
+    </div>`).join('');
+  document.querySelectorAll('.item').forEach(el => el.onclick = () => pick(el.dataset.image, el.dataset.name));
+};
+
+async function pick(image, name) {
+  picked = image;
+  document.querySelectorAll('.item').forEach(el =>
+    el.classList.toggle('active', el.dataset.image === image));
+  $('cfgCard').style.display = '';
+  $('pickedName').textContent = image;
+  $('image').value = image;
+  $('title').value = name || image.split('/').pop();
+  $('slug').value = (name || image.split('/').pop()).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  $('tag').innerHTML = '<option>加载中…</option>';
+  const data = await api('/api/tags?image=' + encodeURIComponent(image));
+  const tags = data.tags || [];
+  $('tag').innerHTML = tags.map(t =>
+    `<option value="${t.tag}">${t.tag} · ${t.updated} · ${fmtSize(t.size)}</option>`).join('')
+    || '<option value="latest">latest</option>';
+}
+
+$('btnInspect').onclick = async () => {
+  const image = $('image').value, tag = $('tag').value;
+  $('inspectHint').textContent = '正在拉取并读取镜像信息…';
+  $('btnInspect').disabled = true;
+  try {
+    const info = await api(`/api/inspect?image=${encodeURIComponent(image)}&tag=${encodeURIComponent(tag)}`);
+    if (!info.ok) { $('inspectHint').textContent = '失败：' + (info.error || ''); return; }
+    if (info.ports && info.ports.length) {
+      $('containerPort').value = info.ports[0];
+      if (!$('hostPort').value) $('hostPort').value = 18000 + Math.floor(Math.random() * 900);
+      $('inspectHint').textContent = '镜像暴露端口：' + info.ports.join(', ');
+    } else {
+      $('inspectHint').textContent = '镜像没有声明端口，请手动填容器内端口';
+    }
+    if (info.env && info.env.length && !$('env').value) {
+      $('env').value = 'TZ=Asia/Shanghai';
+    }
+  } finally {
+    $('btnInspect').disabled = false;
+  }
+};
+
+$('icon').onchange = ev => {
+  const file = ev.target.files[0];
+  if (!file) { iconData = null; $('iconPreview').style.backgroundImage = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    iconData = reader.result;
+    $('iconPreview').style.backgroundImage = `url(${iconData})`;
+  };
+  reader.readAsDataURL(file);
+};
+
+$('btnDeploy').onclick = async () => {
+  const payload = {
+    image: $('image').value,
+    tag: $('tag').value,
+    title: $('title').value.trim(),
+    slug: $('slug').value.trim(),
+    containerPort: $('containerPort').value,
+    hostPort: $('hostPort').value,
+    env: $('env').value.split('\n').map(s => s.trim()).filter(Boolean),
+    volumes: $('volumes').value.split('\n').map(s => s.trim()).filter(Boolean),
+    icon: iconData,
+  };
+  if (!payload.containerPort || !payload.hostPort) { alert('请填写端口'); return; }
+  $('log').style.display = 'block';
+  $('log').textContent = '部署中，请稍候…';
+  $('btnDeploy').disabled = true;
+  try {
+    const r = await api('/api/deploy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    $('log').textContent += '\n' + (r.log || r.error || '');
+    $('log').textContent += r.ok ? '\n✓ 完成' : '\n✗ 失败';
+    if (r.ok) loadApps();
+  } catch (e) {
+    $('log').textContent += '\n请求失败：' + e;
+  } finally {
+    $('btnDeploy').disabled = false;
+  }
+};
+
+async function loadApps() {
+  const data = await api('/api/apps');
+  const apps = data.apps || [];
+  if (!apps.length) { $('apps').innerHTML = '<div class="empty">还没部署任何应用</div>'; return; }
+  $('apps').innerHTML = `<table><thead><tr>
+      <th>名称</th><th>镜像</th><th>端口</th><th>状态</th><th>图标</th><th></th></tr></thead><tbody>
+      ${apps.map(a => `<tr>
+        <td>${a.title}</td>
+        <td class="meta">${a.image}:${a.tag}</td>
+        <td><a href="http://${location.hostname}:${a.hostPort}/" target="_blank">${a.hostPort}</a></td>
+        <td class="${a.status === 'running' ? 'state-ok' : 'state-bad'}">${a.status}</td>
+        <td>${a.registered ? '已注册' : (a.icon ? '仅文件' : '—')}</td>
+        <td><button class="danger" data-slug="${a.slug}">删除</button></td>
+      </tr>`).join('')}</tbody></table>`;
+  document.querySelectorAll('button[data-slug]').forEach(btn => btn.onclick = async () => {
+    if (!confirm('删除 ' + btn.dataset.slug + '？容器、数据目录、桌面图标都会删掉。')) return;
+    btn.disabled = true;
+    const r = await api('/api/remove', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: btn.dataset.slug })
+    });
+    if (!r.ok) alert(r.error || '删除失败');
+    loadApps();
+  });
+}
+
+$('btnRefresh').onclick = loadApps;
+loadApps();
+</script>
+</body>
+</html>

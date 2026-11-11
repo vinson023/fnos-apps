@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "appbox.main": {
+            "title": "容器商店",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "http",
+            "port": "38095",
+            "url": "/",
+            "width": 1280,
+            "height": 860,
+            "allUsers": false
+        }
+    }
+}

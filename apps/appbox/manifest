@@ -1,0 +1,15 @@
+appname=appbox
+version=1.0.0
+display_name=容器商店
+desc=容器商店：搜索 Docker 镜像、生成 compose 并启动容器，还能上传图标把它放到飞牛桌面。
+source=thirdparty
+platform=all
+developer=vinson023
+publisher=vinson023
+maintainer=vinson023
+desktop_uidir=ui
+desktop_applaunchname=appbox.main
+service_port=38095
+ctl_stop=true
+checkport=false
+distributor=vinson023

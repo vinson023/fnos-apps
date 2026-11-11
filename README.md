@@ -35,8 +35,9 @@
 | WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、网络模式、访问端口、管理员密码、数据目录 |
 | Gopeed | `gopeed` | **6882（固定）** | `liwei2633/gopeed:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、下载目录、数据目录、登录账号（**端口固定**） |
 | 端口修复 | `portfix` | **38090（固定）** | `python:3.12-alpine` | iframe 窗口 1180×820 | 网络模式 |
+| 容器商店 | `appbox` | 38095 | `python:3.12-alpine` | iframe 窗口 1280×860 | 网络模式、访问端口、数据目录 |
 
-**十六个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十七个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 **七个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
@@ -70,7 +71,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（十六个应用全都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十七个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -821,6 +822,31 @@ device-code 远程配对。
 - ⚠️ **没有登录校验**，别把 38090 映射到公网。
 - 状态含义：**一致**（图标端口确实在用）、**不一致**（可一键修复）、**无端口**（走 `/app/xxx`
   网关的应用，本来就不带端口）、**端口未知**（容器没起来或名字对不上，可手填端口再修）。
+
+## 容器商店（appbox）
+
+前面每加一个应用都要写一份 fpk；这个是反过来：**在网页里选一个 Docker 镜像，自动生成 compose、
+起容器，并把桌面图标加上去**。
+
+- 流程：搜镜像（Docker Hub）→ 选标签 → 「读取镜像信息」自动填端口（`docker image inspect` 的
+  `ExposedPorts`）→ 填宿主机端口 / 环境变量 / 挂载 → 上传图标 → 部署
+- 产物：`数据目录/apps/<标识>/docker-compose.yaml`（真文件，可自己改）、容器名 `appbox-<标识>`
+- 图标：上传的图会存成 `ui/images/<标识>_256.png` 与 `_64.png`，然后往 `app_service` 插一行
+  （`icon = ui/images/<标识>_{0}.png`），最后**重启 `trim_app_center`** —— 桌面就多一个图标，
+  点开是 `http://host:<你填的端口>/`
+- 删除：`compose down` + 删目录 + 删两张图标 + 删 `app_service` 行 + 重启应用中心，都只动自己的东西
+
+**四个注意点：**
+
+1. **权限等于宿主机 root**。挂载 `docker.sock`（任意容器）、`/var/run/postgresql`（写桌面登记表）、
+   以及自己的 `ui/images`。**拿到这个页面 = 拿到整台 NAS**，只能内网用，别映射公网。
+2. **必须重启应用中心**才会出现新图标。实测「只插库不重启」桌面**看不到**新图标；
+   容器里没有 systemd，所以用一次性特权容器 `nsenter -t 1 -m -p systemctl restart trim_app_center`。
+   每加/删一个图标会有一次 5–8 秒的桌面重载。
+3. **只适合「前台常驻 + 带 Web 界面」的镜像**。一次性任务、需要 `--privileged`、
+   需要额外初始化脚本的镜像不要硬套；那些场景请自己写 fpk。
+4. **端口要对得上**：填的容器内端口必须和镜像实际监听一致（读 inspect 能拿到声明的端口，
+   但有些镜像声明和实际不符）。启动后页面打不开，先 `docker logs appbox-<标识>` 看。
 
 ## 关于第三方代码
 

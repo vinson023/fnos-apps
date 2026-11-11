@@ -1,0 +1,36 @@
+services:
+  appbox:
+    # 容器商店：搜索镜像 → 生成 compose → 起容器 → 往桌面加图标
+    image: python:3.12-alpine
+    container_name: appbox
+    restart: unless-stopped
+    network_mode: ${wizard_network_mode}
+    # 必须以 root 运行：要读 docker.sock、要能连 postgres 的 peer 认证、要往应用目录写图标
+    user: "0:0"
+    ports:
+      # host 模式下这行会被 Docker 忽略，端口由下面的 PORT 直接监听
+      - "${wizard_web_port}:${wizard_web_port}"
+    environment:
+      - TZ=Asia/Shanghai
+      - PORT=${wizard_web_port}
+      - APPBOX_DATA=/data
+      - APPBOX_ICONS=/icons
+      - APPBOX_WWW=/www
+    volumes:
+      # 部署记录与应用目录（每个应用一个子目录，里面是生成好的 docker-compose.yaml）
+      - ${wizard_data_dir}:/data
+      # 建容器 / 查状态 / 启停都靠它。等于宿主机 root 权限，见向导里的警告
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 写 appcenter.app_service（桌面图标登记表），peer 认证要求 root
+      - /var/run/postgresql:/var/run/postgresql
+      # 页面与后端脚本，只读
+      - ../www:/www:ro
+      # 图标目录：写到这里，桌面就能通过 app-center-static 取到
+      - /vol1/@appcenter/appbox/ui/images:/icons
+    command:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache docker-cli docker-cli-compose postgresql-client >/dev/null 2>&1 || true
+        python3 -m pip install --quiet --no-cache-dir pillow >/dev/null 2>&1 || true
+        exec python3 /www/server.py
