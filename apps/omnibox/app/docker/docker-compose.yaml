@@ -6,13 +6,22 @@ services:
     container_name: omnibox
     # 异常退出或宿主机重启后自动拉起
     restart: always
+    # 网络模式由安装向导决定（host / bridge）。
+    # 两种模式下端口都是用户填的那个，因为下面用 SERVER_PORT 让进程自己监听这个号。
+    network_mode: ${wizard_network_mode}
     ports:
-      # 容器内固定监听 7023（镜像里写死，没有环境变量可改），
-      # 所以这里只把宿主机端口做成可选：前后端口号不同，这是本包唯一一个例外。
-      - "${wizard_web_port}:7023"
+      # host 模式下 Docker 会忽略这行（只打印一条 warning），端口由进程直接监听
+      - "${wizard_web_port}:${wizard_web_port}"
     environment:
       # 时区，影响直播节目单（EPG）与录制文件时间
       - TZ=Asia/Shanghai
+      # 进程实际监听的端口。必须是 SERVER_PORT —— 单独的 PORT 无效（实测过），
+      # 二进制里没有别的开关，所以这是让容器内监听端口跟着向导走的唯一途径
+      - SERVER_PORT=${wizard_web_port}
+      # 爬虫 SDK（/app/static/sdk/omnibox_sdk.py 与 .js）默认连
+      # http://localhost:7023/api/spider/omnibox。端口一改，导入的爬虫脚本就找不到后端，
+      # 所以显式覆盖成用户选的端口（SDK 优先读 OMNIBOX_API_URL）
+      - OMNIBOX_API_URL=http://127.0.0.1:${wizard_web_port}/api/spider/omnibox
     volumes:
       # /app/data 里放 SQLite 数据库、爬虫脚本及其 node_modules、.pip_packages、
       # 网盘授权令牌和缓存。镜像把 NODE_PATH / PYTHONPATH 都指向这里，

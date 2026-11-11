@@ -31,7 +31,7 @@
 | WeTTY | `wetty` | 3002 | `butlerx/wetty:latest` | iframe 窗口 1100×760 | Web 端口、SSH 登录目标 |
 | Nexterm | `nexterm` | 6989（内部另有 7989） | `nexterm/aio:latest` | iframe 窗口 1200×800 | 镜像版本、网络模式、Web 端口、数据目录、加密密钥 |
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
-| OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
+| OmniBox | `omnibox` | 7023 | `lampon/omnibox:beta` | 新页签 | 镜像版本、网络模式、访问端口、数据目录 |
 | WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、网络模式、访问端口、管理员密码、数据目录 |
 | Gopeed | `gopeed` | **6882（固定）** | `liwei2633/gopeed:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、下载目录、数据目录、登录账号（**端口固定**） |
 | 端口修复 | `portfix` | **38090（固定）** | `python:3.12-alpine` | iframe 窗口 1180×820 | 网络模式 |
@@ -48,8 +48,9 @@
 
 网络模式与端口的取舍见「网络模式与端口」一节 —— 有几个应用是**故意不给** bridge 或端口选项的，
 原因是给了会坏功能（BT 的 P2P、终端的 127.0.0.1、RustDesk 写死在客户端的端口）。
-反过来 `omnibox` 是**故意只给 bridge**：镜像把监听端口 7023 写死在二进制里（`PORT` 环境变量无效），
-host 模式下就没法换端口了，所以改用桥接 + `"${wizard_web_port}:7023"`，宿主端口照样可选。
+`omnibox` 曾经也是「只给 bridge」，理由是当时测出端口写死在二进制里（`PORT` 环境变量确实无效）。
+1.0.5 起这个结论被推翻：镜像认的是 **`SERVER_PORT`**，进程能监听任意端口，
+所以它现在和别的应用一样有 host / bridge + 可改端口，`ports` 也是前后同号。
 
 ## 仓库结构
 
@@ -624,12 +625,24 @@ device-code 远程配对。
    安全上必须清楚：**WeTTY 把认证完全交给 ssh，谁能访问 3002，谁就能看到密码提示并尝试登录**。
    不要把 3002 直接映射到公网；要外网用请走 VPN，或自己加一层带认证的反向代理。
 
-## OmniBox 的四个注意点
+## OmniBox 的五个注意点
 
-1. **镜像端口写死 7023，改不了**。二进制里硬编码 `:7023`，`PORT` 环境变量无效
-   （实测 `-e PORT=8099` 仍然监听 7023），启动日志里是 `服务器启动 address=:7023`。
-   所以本包**只提供 bridge 模式**，用 `"${wizard_web_port}:7023"` 把宿主端口做成可选——
-   host 模式下没有端口映射，就没法换端口了。这是全仓库唯一一个「前后端口号不同」的 compose。
+1. **端口能改，靠的是 `SERVER_PORT`，不是 `PORT`**。踩过的坑：早期只试了 `PORT`，
+   实测 `-e PORT=8099` 仍然 `address=:7023`，于是误判成「端口写死、只能 bridge」。
+   实际上二进制认的是 `SERVER_PORT`：
+
+   ```
+   -e SERVER_PORT=8097  →  日志 address=:8097，ss 只有 *:8097
+   ```
+
+   所以 1.0.5 起 compose 用 `network_mode: ${wizard_network_mode}` + 前后同号的
+   `"${wizard_web_port}:${wizard_web_port}"` + `SERVER_PORT=${wizard_web_port}`，
+   host / bridge 两种模式下端口都真正生效（各实测一遍：host 17023、bridge 17024，均 200）。
+
+   还有一个连带项必须一起改：爬虫 SDK（`/app/static/sdk/omnibox_sdk.py` 与 `.js`）默认连
+   `http://localhost:7023/api/spider/omnibox`，所以 compose 里同时注入
+   `OMNIBOX_API_URL=http://127.0.0.1:${wizard_web_port}/api/spider/omnibox`——
+   否则改端口后导入的爬虫脚本会找不到后端。已在容器里验证 SDK 读到的就是这个新地址。
 
 2. **`beta` 才是主线，`latest` 是旧版**。上游 v3 重写后一直挂着 beta 标签：
    `beta` = v3.2.1-beta.1（2026-10），`latest` = v2.x（2026-05，四个月没动）。
