@@ -33,7 +33,7 @@
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
 | OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
 | WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、网络模式、访问端口、管理员密码、数据目录 |
-| Gopeed | `gopeed` | 9999 | `liwei2633/gopeed:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、访问端口、下载目录、数据目录、登录账号 |
+| Gopeed | `gopeed` | 9999 + 自定义端口（双容器：`gopeed` + `gopeed-fwd` 转发 9999） | `liwei2633/gopeed:latest` + `alpine/socat` | iframe 窗口 1280×860 | 镜像版本、网络模式、访问端口、下载目录、数据目录、登录账号 |
 
 **十五个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
