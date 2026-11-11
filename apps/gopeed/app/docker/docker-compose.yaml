@@ -11,7 +11,7 @@ services:
     network_mode: ${wizard_network_mode}
     ports:
       # host 模式下 Docker 会忽略这行（只打印一条 warning），端口由进程直接监听
-      - "${wizard_web_port}:${wizard_web_port}"
+      - "6882:6882"
     entrypoint:
       - /bin/sh
       - -c
@@ -33,7 +33,7 @@ services:
       - UMASK=022
       # 监听端口 = 用户填的端口。GOPEED_ 前缀的环境变量直接映射成配置项，
       # 所以两种网络模式下端口都是真正可改的（实测 18888 生效）
-      - GOPEED_PORT=${wizard_web_port}
+      - GOPEED_PORT=6882
       # Web 界面账号密码。密码一旦设置就会启用登录，不设就是裸奔 ——
       # gopeed 官方文档明确说暴露在公网必须开认证
       - GOPEED_USERNAME=${wizard_username}
