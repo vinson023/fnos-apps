@@ -694,7 +694,7 @@ device-code 远程配对。
    管理端 148MB 约 9 秒（层可复用），比想象中快，但首次安装确实要等一会儿。
    数据目录 `…/upstream/auths` 里是每个账号的授权文件，**删了就得重新扫码**，务必纳入备份。
 
-## Gopeed 的五个注意点
+## Gopeed 的六个注意点
 
 1. **端口是真的可改**。`GOPEED_PORT` 属于 `GOPEED_ConfigKey` 那套环境变量映射，会被当成配置项
    `port` 读进去，**进程自己监听这个号**——不是在宿主机侧做端口映射。
@@ -719,6 +719,21 @@ device-code 远程配对。
    本包的向导里是必填的。登录接口是 **`POST /api/web/login`**（不是 `/api/v1/user/login`，
    后者在 v1.9.3 上返回 401 会让人以为密码错了），返回的 token 用 `Authorization: Bearer <token>`
    访问 `/api/v1/*`。另外 `/` 没有任何 `X-Frame-Options` 或 CSP，所以桌面用 iframe 内嵌。
+
+6. **密码由环境变量决定，在界面里改不掉**。`GOPEED_USERNAME` / `GOPEED_PASSWORD` 属于
+   `GOPEED_` 前缀的 env→配置映射，**每次容器启动都会按它设一遍**，而且数据目录里
+   **没有保存密码**（`gopeed.db` 里 grep 不到明文，它只在运行时生效）。
+  实测三条，结论一致：
+
+   | 操作 | 结果 |
+   |---|---|
+   | `PUT /api/v1/config` 带新 `password` | 返回 200，但新密码登录 **401**、旧密码仍 200 |
+   | `docker restart` 后用界面改的新密码 | **401**；旧密码 200 |
+   | 同一份 `gopeed.db` + 换个 `GOPEED_PASSWORD` 起新容器 | 新密码 **200**，旧密码 **401** |
+
+   所以**换密码只能重装本应用**（在向导里填新的），或者手动改宿主机上
+   `/vol1/@appcenter/gopeed/docker/docker-compose.yaml` 的 `GOPEED_PASSWORD` 再重建容器
+   （下次重装 fpk 会被向导值覆盖回去）。数据目录不受影响，任务列表和已下好的文件都在。
 
 ## 关于第三方代码
 
