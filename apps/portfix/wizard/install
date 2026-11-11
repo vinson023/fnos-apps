@@ -1,0 +1,39 @@
+[
+    {
+        "stepTitle": "这是什么",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "飞牛在安装应用的那一刻，就把<b>桌面图标要打开的地址</b>写进了系统数据库（<code>appcenter.app_service.url</code>），里面那个端口来自安装包，<b>之后你把应用改到哪个端口它都不管</b>。<br><br>所以常见的情况是：装的时候把应用端口改成了 9081，浏览器输 <code>:9081</code> 能打开，但点桌面图标还是去原来的 8081 —— 打不开。<br><br>这个小工具就是干这个的：<b>读出所有图标记录，跟每个应用 compose 里的真实端口比对</b>，不一致的列出来，点一下「修复」就改好，立刻生效。<br><br>以后新装的应用也会自动出现在列表里，不用改任何配置。"
+            }
+        ]
+    },
+    {
+        "stepTitle": "权限说明",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "⚠️ <b>这个工具比一般应用拿的权限多，装之前请看完</b>：<br><br>· 容器<b>以 root 运行</b>，并挂载了宿主机的 postgres socket，所以能读写 <code>appcenter</code> 库。<br>· 它只会执行两类 SQL：<code>select</code> 读 <code>app_service</code>，以及 <code>update app_service set url = ...</code> 改图标地址。代码就在 <code>server.py</code> 里，只有几十行，可以自己看。<br>· 只读挂载了 <code>/vol1/@appcenter</code>，用来解析各应用的 compose 拿真实端口，不会写。<br><br>⚠️ <b>不要把它映射到公网</b>。它没有登录校验，能访问到 38090 的人就能改你的应用地址。内网用、或者加一层带认证的反代。<br><br>端口固定 <b>38090</b>（工具本身没法用自己修自己，所以定死）。"
+            },
+            {
+                "type": "radio",
+                "field": "wizard_network_mode",
+                "label": "网络模式",
+                "initValue": "bridge",
+                "description": "两种都行：数据库 socket 是文件挂载，和网络模式无关。bridge 更隔离，host 少一层转发。",
+                "options": [
+                    {
+                        "value": "bridge",
+                        "label": "bridge",
+                        "description": "默认。容器独立网络，38090 由 Docker 映射出去。"
+                    },
+                    {
+                        "value": "host",
+                        "label": "host",
+                        "description": "直接用宿主机网络，38090 由进程自己监听。"
+                    }
+                ]
+            }
+        ]
+    }
+]

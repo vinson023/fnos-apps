@@ -1,0 +1,15 @@
+appname=portfix
+version = 1.0.0
+display_name=端口修复
+desc=飞牛桌面图标的地址是安装时写死的，改了应用端口后图标就打不开。这个小工具把这些记录列出来，跟应用实际端口比对，点一下就能改回去。
+source=thirdparty
+platform=all
+developer=vinson023
+publisher=vinson023
+maintainer=vinson023
+desktop_uidir=ui
+desktop_applaunchname=portfix.main
+service_port=38090
+ctl_stop=true
+checkport=false
+distributor=vinson023

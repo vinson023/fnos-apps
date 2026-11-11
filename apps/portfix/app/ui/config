@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "portfix.main": {
+            "title": "端口修复",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "38090",
+            "url": "/",
+            "width": 1180,
+            "height": 820,
+            "allUsers": false
+        }
+    }
+}

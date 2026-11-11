@@ -1,0 +1,35 @@
+services:
+  portfix:
+    # 一个只做一件事的小工具：读 appcenter 数据库里每条桌面图标的地址，
+    # 跟应用 compose 里的真实端口比对，不一致的一键改回来。
+    #
+    # 用 python:3.12-alpine 是因为它最小又自带 Python；psql 客户端在启动时
+    # 用 apk 装（约 2MB，只装一次，容器重建才会重装）。
+    image: python:3.12-alpine
+    container_name: portfix
+    restart: unless-stopped
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 忽略这行，进程本来就在 38090 监听
+      - "38090:38090"
+    # 必须 root：下面要读 postgres 的 unix socket，pg_hba 里
+    # `local all postgres peer map=trim_root` 把 root 映射成 postgres
+    user: "0:0"
+    environment:
+      - TZ=Asia/Shanghai
+      - PORTFIX_PORT=38090
+    command:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache postgresql-client docker-cli >/dev/null 2>&1 || true
+        exec python /www/server.py
+    volumes:
+      # postgres 的 socket 目录（read-write 其实只用 socket，不写数据）
+      - /var/run/postgresql:/var/run/postgresql
+      # 页面与后端脚本，相对 compose 所在目录（../www）
+      - ../www:/www:ro
+      # 读容器实际端口（docker inspect），只读挂载
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # 只读挂载所有应用目录，用来解析各自的 compose 拿真实端口
+      - /vol1/@appcenter:/apps:ro

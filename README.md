@@ -34,8 +34,9 @@
 | OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
 | WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、网络模式、访问端口、管理员密码、数据目录 |
 | Gopeed | `gopeed` | **6882（固定）** | `liwei2633/gopeed:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、下载目录、数据目录、登录账号（**端口固定**） |
+| 端口修复 | `portfix` | **38090（固定）** | `python:3.12-alpine` | iframe 窗口 1180×820 | 网络模式 |
 
-**十五个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十六个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 **七个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
@@ -68,7 +69,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（十五个应用全都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十六个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -750,6 +751,24 @@ device-code 远程配对。
    所以**换密码只能重装本应用**（在向导里填新的），或者手动改宿主机上
    `/vol1/@appcenter/gopeed/docker/docker-compose.yaml` 的 `GOPEED_PASSWORD` 再重建容器
    （下次重装 fpk 会被向导值覆盖回去）。数据目录不受影响，任务列表和已下好的文件都在。
+
+## 端口修复（portfix）
+
+前面反复提到一件事：**飞牛在安装那一刻就把桌面图标的地址写进数据库**，里面的端口来自包内
+`ui/config`，之后你把应用改到哪个端口它都不管。所以改过端口的应用，图标会指向一个没人监听的号。
+
+这个应用就是来收尾的：它把 `appcenter.app_service` 里每条图标记录列出来，跟**容器实际在用**
+的端口比对（`docker inspect` 的端口映射 + 环境变量里的 `*_PORT=`），不一致的标红，点一下「修复」
+就把地址改过去。**新装的应用自动出现在列表里**，不用改任何配置。
+
+- **端口固定 38090**：工具没法用自己修自己，所以定死；被占用的话重装前先腾出来。
+- **权限比一般应用高**：容器以 root 运行，挂载 postgres socket（`pg_hba` 里
+  `local all postgres peer map=trim_root` 把 root 映射成 postgres）和 `docker.sock`（只读，
+  为了 `docker inspect`）。它只做两件事：读 `app_service`、把 `url` 里的端口改掉，代码就在
+  `app/www/server.py`，不到 300 行，可以自己审。
+- ⚠️ **没有登录校验**，别把 38090 映射到公网。
+- 状态含义：**一致**（图标端口确实在用）、**不一致**（可一键修复）、**无端口**（走 `/app/xxx`
+  网关的应用，本来就不带端口）、**端口未知**（容器没起来或名字对不上，可手填端口再修）。
 
 ## 关于第三方代码
 
