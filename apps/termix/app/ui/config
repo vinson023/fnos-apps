@@ -4,9 +4,9 @@
             "title": "Termix",
             "icon": "images/icon_{0}.png",
             "type": "url",
-            "protocol": "",
+            "protocol": "http",
             "port": "7080",
-            "url": "/?v=1.0.4",
+            "url": "/?v=1.0.5",
             "allUsers": false
         }
     }

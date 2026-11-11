@@ -1,5 +1,5 @@
 appname=xunlei
-version=1.0.2
+version=1.0.3
 display_name=迅雷
 desc=迅雷远程下载：在手机或电脑的迅雷 App 里添加任务，由 NAS 24 小时离线下载，支持迅雷云盘与 HTTP/BT 等多协议。
 source=thirdparty

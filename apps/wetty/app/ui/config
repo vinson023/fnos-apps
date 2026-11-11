@@ -4,9 +4,9 @@
             "title": "WeTTY",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
-            "protocol": "",
+            "protocol": "http",
             "port": "3002",
-            "url": "/?v=1.0.4",
+            "url": "/?v=1.0.5",
             "width": 1100,
             "height": 760,
             "allUsers": false

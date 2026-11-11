@@ -316,6 +316,45 @@ trim_sac.entry.open_type        ← 展示层
 **重新安装 fpk 时包里的 `ui/config` 会写回数据库**——所以源码里的值必须和期望一致，
 否则每次重装都会被打回。本项目曾因 Emby 源码里遗留 `iframe` 而反复变回窗口模式。
 
+## HTTPS 下的访问（`protocol` 字段）
+
+**现象**：在 fnOS 里打开「强制 HTTPS」（http 5666 → https 5667）之后，桌面上**所有**自建应用的图标
+都打不开。
+
+**根因**：桌面拼图标地址时用的是
+
+```js
+`${entry.protocol || location.protocol.replace(':','')}://${hostname}:${port}${path}`
+```
+
+`ui/config` 里 `protocol` 为空 → 跟随当前页面协议 → 在 https 桌面下变成
+`https://nas:7023/`，而容器只讲 HTTP，浏览器直接报 `ERR_SSL_PROTOCOL_ERROR`。
+实测 `curl -k https://127.0.0.1:7023/` → `SSL routines::wrong version number`。
+
+**修法**：`app/ui/config` 里把 `"protocol": ""` 改成 `"protocol": "http"`（本项目所有应用已改）。
+这样地址固定为 `http://host:端口`，桌面是 http 还是 https 都能打开。
+
+已经装过的应用，三处都要改，**并且最后必须重启应用中心**：
+
+```bash
+# 1) 数据库：url 和 default_url 前面补 http
+#    default_url 是桌面实际用的那份，只改 url 不够（实测过）
+# 2) /vol1/@appcenter/<app>/ui/config 的 protocol 改成 http
+# 3) systemctl restart trim_app_center   ← 服务端缓存了服务列表，不重启不生效
+sh scripts/fix-https.sh            # 全部应用
+sh scripts/fix-https.sh omnibox    # 单个应用
+```
+
+> **那个重启是必须的**。曾经改完库和配置文件后点图标仍然是 `https://…`，
+> 重启 `trim_app_center.service` 后立刻变成 `http://…`——服务端把服务列表缓存在内存里。
+
+**iframe 类应用在 https 桌面下会有 `Mixed Content` 警告**（`requested an insecure frame 'http://…'`），
+但实测能正常渲染（Chrome + 自签证书）。fnOS 官方应用（`fndepot`、`fygo-browser`）也是这么发的，
+它们本来就在 `ui/config` 里写 `"protocol": "http"`。
+
+如果你不想让应用走 http，另一条路是**给每个应用套一层带证书的反向代理**
+（Lucky / nginx），再把图标地址改成反代地址（可用「端口修复」工具改）。
+
 ## AriaNg 的五个注意点
 
 1. **纯静态，没有任何反向代理**。`app/docker/default.conf` 只做静态托管，容器里没有

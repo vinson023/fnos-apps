@@ -1,5 +1,5 @@
 appname=nexterm
-version=1.0.3
+version=1.0.4
 display_name=Nexterm
 desc=Nexterm 是基于 Web 的服务器管理器，浏览器里统一管理 SSH、VNC、RDP、Telnet 连接。
 source=thirdparty

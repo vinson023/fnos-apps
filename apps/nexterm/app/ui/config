@@ -4,9 +4,9 @@
             "title": "Nexterm",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
-            "protocol": "",
+            "protocol": "http",
             "port": "6989",
-            "url": "/?v=1.0.3",
+            "url": "/?v=1.0.4",
             "width": 1200,
             "height": 800,
             "allUsers": false

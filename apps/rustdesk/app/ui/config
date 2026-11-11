@@ -4,7 +4,7 @@
             "title": "RustDesk 服务器信息",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
-            "protocol": "",
+            "protocol": "http",
             "port": "21120",
             "url": "/",
             "width": 900,

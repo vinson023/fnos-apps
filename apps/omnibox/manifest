@@ -1,5 +1,5 @@
 appname=omnibox
-version=1.0.5
+version=1.0.6
 display_name=OmniBox
 desc=OmniBox 是自托管的多媒体聚合平台，把影视、电视直播、音乐、听书、短剧与网盘资源集中到一个网页里播放。
 source=thirdparty

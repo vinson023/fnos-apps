@@ -1,5 +1,5 @@
 appname=metube
-version=1.0.3
+version=1.0.4
 display_name=MeTube
 desc=MeTube 基于 yt-dlp 的自托管视频下载器，带 Web 界面管理下载队列。
 source=thirdparty

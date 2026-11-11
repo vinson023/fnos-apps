@@ -4,7 +4,7 @@
             "title": "迅雷",
             "icon": "images/icon_{0}.png",
             "type": "iframe",
-            "protocol": "",
+            "protocol": "http",
             "port": "2345",
             "url": "/",
             "allUsers": false

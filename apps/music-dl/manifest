@@ -1,5 +1,5 @@
 appname=music-dl
-version=1.0.3
+version=1.0.4
 display_name=Music-DL
 desc=Music-DL music download tool
 source=thirdparty

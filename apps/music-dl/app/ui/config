@@ -4,7 +4,7 @@
             "title": "Music-DL",
             "icon": "images/icon_{0}.png",
             "type": "url",
-            "protocol": "",
+            "protocol": "http",
             "port": "8099",
             "url": "/",
             "allUsers": false
