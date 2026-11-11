@@ -1,0 +1,15 @@
+appname=gopeed
+version=1.0.0
+display_name=Gopeed
+desc=Gopeed 是 Go 写的现代下载器：HTTP/HTTPS、BitTorrent、磁力与 ed2k 一把梭，自带 Web 界面、REST API 和浏览器扩展。
+source=thirdparty
+platform=all
+developer=vinson023
+publisher=vinson023
+maintainer=vinson023
+desktop_uidir=ui
+desktop_applaunchname=gopeed.main
+service_port=9999
+ctl_stop=true
+checkport=false
+distributor=vinson023

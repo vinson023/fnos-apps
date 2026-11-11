@@ -33,14 +33,15 @@
 | Termix | `termix` | 7080 | `termixssh/termix:latest` | 新页签 | 镜像版本、网络模式、Web 端口、数据目录 |
 | OmniBox | `omnibox` | 7023（宿主端口可改） | `lampon/omnibox:beta` | 新页签 | 镜像版本、访问端口、数据目录 |
 | WorkBuddy 管理器 | `workbuddy` | 7864 | `ghcr.io/ithtelab/workbuddy-manager` + `workbuddy2api`（双容器） | 新页签 | 镜像版本、网络模式、访问端口、管理员密码、数据目录 |
+| Gopeed | `gopeed` | 9999 | `liwei2633/gopeed:latest` | iframe 窗口 1280×860 | 镜像版本、网络模式、访问端口、下载目录、数据目录、登录账号 |
 
-**十四个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
+**十五个应用全都带安装向导**：装的时候能选网络模式（host / bridge）、端口，以及数据目录、媒体库、
 下载目录这些路径，选完 compose 自动按选择生效，不用装完再改文件。机制见下面「安装向导」一节。
 
 **七个应用还能选镜像通道**：`aria2ng`（字段 `wizard_aria2_tag`，latest / test）、`xunlei`、`emby`、
 `moviepilot`、`nexterm`（latest / development）、`termix`、`omnibox`（latest / beta，字段均为
 `wizard_image_tag`）。选中的值直接拼进 compose 的 `image:` 行，装完想换通道就重装一次。
-`workbuddy` 也用同一个字段，但它的两个镜像**没有 beta 通道**，所以选项是 `latest` / `2.11.12`（钉版本），
+`gopeed`、`workbuddy` 也用同一个字段，但它们的镜像**没有 beta 别名**，所以选项是 `latest` / `2.11.12`（钉版本），
 并且一个值同时决定上游与管理端两个镜像的标签——这两个项目是同版本号发布的。
 其余应用的镜像上游只有 `latest` 一个通道（或 beta 标签早已停更），没有可选项。
 
@@ -67,7 +68,7 @@ apps/<appname>/
 │   ├── resource            # 必须含 docker-project 段，否则被识别为普通应用
 │   └── privilege           # 运行身份
 └── wizard/
-    └── install             # 安装向导（十四个应用全都有，字段值经 ${wizard_xxx} 进 compose）
+    └── install             # 安装向导（十五个应用全都有，字段值经 ${wizard_xxx} 进 compose）
 ```
 
 ## 构建
@@ -282,6 +283,8 @@ Termix 的 nginx 模板里写的是 `listen ${PORT};`，只绑 IPv4（`0.0.0.0:7
 | `workbuddy` | `wizard_data_dir` | `/vol1/1000/docker/workbuddy` | 拆成两个子目录，见下 |
 | `workbuddy` | `…/manager` | 自动创建 | `/app/data`：SQLite、`users.json`（会话密钥）、日志 |
 | `workbuddy` | `…/upstream` | 自动创建 | 同时挂到上游的 `/app/state` 与管理端的 `/opt/workbuddy2api` |
+| `gopeed` | `wizard_download_dir` | `/vol1/1000/downloads` | `/app/Downloads`（Gopeed 默认下载目录） |
+| `gopeed` | `wizard_data_dir` | `/vol1/1000/docker/gopeed` | `/app/storage`（`gopeed.db` + `logs/`） |
 
 Music-DL 的两个挂载点以镜像内的实际路径为准，不要随意改：
 
@@ -691,6 +694,32 @@ device-code 远程配对。
    管理端 148MB 约 9 秒（层可复用），比想象中快，但首次安装确实要等一会儿。
    数据目录 `…/upstream/auths` 里是每个账号的授权文件，**删了就得重新扫码**，务必纳入备份。
 
+## Gopeed 的五个注意点
+
+1. **端口是真的可改**。`GOPEED_PORT` 属于 `GOPEED_ConfigKey` 那套环境变量映射，会被当成配置项
+   `port` 读进去，**进程自己监听这个号**——不是在宿主机侧做端口映射。
+   所以 host 模式（没有映射）下同样生效：实测 host + 19999 时 `ss` 里只有 `*:19999`，没有 9999。
+
+2. **下载目录的默认值就是 `/app/Downloads`**。这是从 `/api/v1/config` 读出来的
+   `downloadDir` 默认值，所以宿主机目录必须挂在那个位置，改挂别处就得进界面手动改。
+   实测下发一个 200KB 的 HTTP 任务，文件落在 `/vol1/1000/downloads/__down`、属主 `admin`。
+
+3. **上游 entrypoint 的 `chown -R /app` 被换掉了**。原脚本每次启动都会对整个 `/app` 递归 chown，
+   而下载目录就挂在 `/app/Downloads` 下面——库大了（十万级 inode）重启会明显变慢。
+   本包改成只 chown 两个挂载点**目录本身**：进程以 `PUID=1000` 运行，它新建的文件天生就是对的属主。
+   代价是：如果下载目录里原本有别的 uid 的文件，gopeed 可能删不掉，需要手动改一次属主。
+   `PUID/PGID` 固定 `1000:1000`（飞牛的 admin），和 AriaNg / 迅雷 一致。
+
+4. **`latest` 是 v1.9.3，v2 一直挂在 beta 上**。`latest` 构建于 2026-03，
+   `v2.0.0-beta.4` 构建于 2026-11——**beta 比 latest 新得多**，但上游从 2025 年底就没正式发过 v2，
+   作者自己写的是「部分功能可能不完整或不稳定」。所以向导默认 `latest`。
+   两者任务库格式不同，换通道请当作全新安装。
+
+5. **认证与 API 的路径容易记错**。`GOPEED_PASSWORD` 不设就完全不启用认证（裸奔），
+   本包的向导里是必填的。登录接口是 **`POST /api/web/login`**（不是 `/api/v1/user/login`，
+   后者在 v1.9.3 上返回 401 会让人以为密码错了），返回的 token 用 `Authorization: Bearer <token>`
+   访问 `/api/v1/*`。另外 `/` 没有任何 `X-Frame-Options` 或 CSP，所以桌面用 iframe 内嵌。
+
 ## 关于第三方代码
 
 `apps/aria2ng/app/docker/html/` 是 [AriaNg](https://github.com/mayswind/AriaNg) v1.2.3
@@ -714,6 +743,11 @@ device-code 远程配对。
 
 `apps/wetty/app/docker/wetty-shell.sh` 是仓库自己写的 8 行入口脚本（`exec ssh`），
 不来自上游；WeTTY 本体（`butlerx/wetty`，MIT）以官方镜像原样运行，仓库里不含其源码。
+
+`apps/gopeed/` 里的图标取自 Gopeed Web 界面自带的 PWA 图标
+（镜像内 `/icons/Icon-512.png`，512×512 透明底、绿色品牌色圆角方块），
+只做了等比缩放到 256 / 64，图形未改动。Gopeed 本体（`liwei2633/gopeed`，MIT）以官方镜像原样运行，
+仓库里不含其源码。
 
 `apps/workbuddy/` 里的图标取自管理端镜像自带的 PWA 图标
 （`/app/web/out/favicon/android-chrome-512x512.png`，512×512 透明底、自带圆角），

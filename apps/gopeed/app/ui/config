@@ -1,0 +1,15 @@
+{
+    ".url": {
+        "gopeed.main": {
+            "title": "Gopeed",
+            "icon": "images/icon_{0}.png",
+            "type": "iframe",
+            "protocol": "",
+            "port": "9999",
+            "url": "/",
+            "width": 1280,
+            "height": 860,
+            "allUsers": false
+        }
+    }
+}

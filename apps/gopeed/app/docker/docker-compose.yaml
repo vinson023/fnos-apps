@@ -1,0 +1,46 @@
+services:
+  gopeed:
+    # Gopeed：Go + Flutter 写的下载器，支持 HTTP / BitTorrent / 磁力 / ed2k，
+    # 镜像里自带 Web 界面（前端编译进二进制），无外部依赖
+    image: liwei2633/gopeed:${wizard_image_tag}
+    container_name: gopeed
+    # 异常退出或宿主机重启后自动拉起
+    restart: unless-stopped
+    # 网络模式由安装向导决定（host / bridge）。两种模式下端口都是用户填的那个，
+    # 因为下面用 GOPEED_PORT 让进程自己监听这个号（不是只在宿主机侧映射）。
+    network_mode: ${wizard_network_mode}
+    ports:
+      # host 模式下 Docker 会忽略这行（只打印一条 warning），端口由进程直接监听
+      - "${wizard_web_port}:${wizard_web_port}"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        # 上游 entrypoint 是 `chown -R /app`。下载目录挂进来以后，这等于每次启动
+        # 都把整个下载库的 inode 全扫一遍 —— 库大了（几十万文件）重启会明显变慢。
+        # 这里只把两个挂载点「目录本身」的属主改掉：进程本来就以 PUID 运行，
+        # 它自己新建的文件天生就是对的属主，不需要全树 chown。
+        chown $${PUID}:$${PGID} /app/storage /app/Downloads 2>/dev/null || true
+        umask $${UMASK}
+        exec su-exec $${PUID}:$${PGID} ./gopeed
+    environment:
+      # 时区，影响任务列表里的时间显示与日志
+      - TZ=Asia/Shanghai
+      # 以 admin(1000:1000) 身份下载，文件属主和 aria2 / 迅雷一致，
+      # 在飞牛「文件管理」里能直接改名 / 删除，不会变成 root 的东西
+      - PUID=1000
+      - PGID=1000
+      - UMASK=022
+      # 监听端口 = 用户填的端口。GOPEED_ 前缀的环境变量直接映射成配置项，
+      # 所以两种网络模式下端口都是真正可改的（实测 18888 生效）
+      - GOPEED_PORT=${wizard_web_port}
+      # Web 界面账号密码。密码一旦设置就会启用登录，不设就是裸奔 ——
+      # gopeed 官方文档明确说暴露在公网必须开认证
+      - GOPEED_USERNAME=${wizard_username}
+      - GOPEED_PASSWORD=${wizard_password}
+    volumes:
+      # 下载目录。挂到 /app/Downloads 是上游约定的位置，
+      # 也让 gopeed 默认的下载目录直接落在这里
+      - ${wizard_download_dir}:/app/Downloads
+      # 数据目录：gopeed.db（SQLite，任务记录 + 全部设置）、logs/
+      - ${wizard_data_dir}:/app/storage
