@@ -44,3 +44,33 @@ services:
       - ${wizard_download_dir}:/app/Downloads
       # 数据目录：gopeed.db（SQLite，任务记录 + 全部设置）、logs/
       - ${wizard_data_dir}:/app/storage
+
+  gopeed-fwd:
+    # 桌面图标的「端口兜底」。
+    #
+    # 飞牛在安装那一刻就把访问地址写进系统数据库（appcenter.app_service.url），
+    # 拼的是包里 ui/config 的 port —— 那就是 9999，不理会向导里填了什么。
+    # 所以用户把端口改成 6882 之后，直接在浏览器访问 6882 是好的，
+    # 但桌面图标仍然去 9999，打不开。而这条记录：
+    #   · ui/config 里写 ${wizard_web_port} 占位符 —— 装不上（appcenter code 10237）
+    #   · 生命周期脚本改库 —— cmd/* 以应用用户跑，psql 没密码
+    #   · appcenter-cli 改 service —— 没有这个子命令
+    # 三条路都堵死，于是在 9999 上放一个转发器：图标打 9999 → 转到用户真实端口。
+    # 这样「端口可改」和「图标能用」同时成立，用户不用再管数据库。
+    image: alpine/socat:latest
+    container_name: gopeed-fwd
+    restart: unless-stopped
+    # 用 host 网络：bridge 模式下宿主机已映射了用户端口，host 模式下进程直接监听，
+    # 两种情况 127.0.0.1:${wizard_web_port} 都通
+    network_mode: host
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ "${wizard_web_port}" = "9999" ]; then
+          # 用户选的就是图标端口，不需要转发（否则会跟 gopeed 抢 9999）
+          echo "[gopeed-fwd] 端口即 9999，无需转发"
+          exec sleep infinity
+        fi
+        echo "[gopeed-fwd] 桌面图标 9999 -> 127.0.0.1:${wizard_web_port}"
+        exec socat TCP-LISTEN:9999,fork,reuseaddr TCP:127.0.0.1:${wizard_web_port}
